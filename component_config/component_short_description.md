@@ -1,1 +1,1 @@
-Testing functional sample extractor for purposes of the python component template. 
+Google Search Console is a web service by Google which allows webmasters to check indexing status and optimize visibility of their websites. 

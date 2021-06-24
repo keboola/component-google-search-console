@@ -1,1 +1,83 @@
-{}
+{
+  "title": "Row Configuration",
+  "type": "object",
+  "required": [
+    "domain",
+    "endpoint",
+    "out_table_name"
+  ],
+  "properties": {
+    "domain": {
+      "title": "Domain",
+      "type": "string",
+      "description": "Domain name you wish to extract data from eg. keboola.com",
+      "propertyOrder": 1
+    },
+    "endpoint": {
+      "title": "Endpoint",
+      "type": "string",
+      "enum": [
+        "Search analytics",
+        "Sitemaps"
+      ],
+      "default": "Search analytics",
+      "propertyOrder": 2
+    },
+    "search_analytics_dimensions": {
+      "title": "Dimensions",
+      "type": "string",
+      "options": {
+        "dependencies": {
+          "endpoint": "Search analytics"
+        }
+      },
+      "description": "List of search analytics dimensions eg. page, query, date",
+      "propertyOrder": 3
+    },
+    "date_range": {
+      "title": "Date range type",
+      "type": "string",
+      "enum": [
+        "Last week (sun-sat)",
+        "Last month",
+        "Custom"
+      ],
+      "options": {
+        "dependencies": {
+          "endpoint": "Search analytics"
+        }
+      },
+      "propertyOrder": 4
+    },
+    "date_from": {
+      "title": "Date from",
+      "type": "string",
+      "options": {
+        "dependencies": {
+          "date_range": "Custom",
+          "endpoint": "Search analytics"
+        }
+      },
+      "description": "Start date of the report eg. 3 days ago",
+      "propertyOrder": 5
+    },
+    "date_to": {
+      "title": "Date to",
+      "type": "string",
+      "options": {
+        "dependencies": {
+          "date_range": "Custom",
+          "endpoint": "Search analytics"
+        }
+      },
+      "description": "End date of the report eg. 1 day ago",
+      "propertyOrder": 6
+    },
+    "out_table_name": {
+      "title": "Output name",
+      "type": "string",
+      "description": "Name of output table in Keboola storage",
+      "propertyOrder": 7
+    }
+  }
+}
