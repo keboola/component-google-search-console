@@ -57,7 +57,6 @@ class GoogleSearchConsoleClient:
         start_row = 0
         response_data = []
         while True:
-            print(start_row)
             request["rowLimit"] = row_limit
             request["startRow"] = start_row
             response = self.execute_search_analytics_request(self.service, url, request)
