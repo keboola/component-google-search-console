@@ -112,7 +112,7 @@ class Component(ComponentBase):
 
     @staticmethod
     def parse_list_from_string(string_list):
-        return [word.strip() for word in string_list.split(",")]
+        return [word.strip() for word in string_list.split(",") if len(word) > 1]
 
     def parse_search_analytics_data(self, data, dimensions):
         parsed_data = []
