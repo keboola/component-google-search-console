@@ -22,7 +22,7 @@ TOKEN_URI = "https://oauth2.googleapis.com/token"
 SITEMAPS_HEADERS = ["path", "lastSubmitted", "isPending", "isSitemapsIndex", "type", "lastDownloaded", "warnings",
                     "errors"]
 
-REQUIRED_PARAMETERS = [KEY_DOMAIN, KEY_OUT_TABLE_NAME, KEY_ENDPOINT, KEY_SEARCH_ANALYTICS_DIMENSIONS]
+REQUIRED_PARAMETERS = [KEY_DOMAIN, KEY_OUT_TABLE_NAME, KEY_ENDPOINT]
 REQUIRED_IMAGE_PARS = []
 
 
@@ -36,6 +36,7 @@ class Component(ComponentBase):
         client_id_credentials = self.configuration.oauth_credentials
         gsc_client = self.get_gsc_client(client_id_credentials)
         out_table_name = params.get(KEY_OUT_TABLE_NAME)
+        self.validate_table_name(out_table_name)
         endpoint = params.get(KEY_ENDPOINT)
         domain = self.set_domain(params.get(KEY_DOMAIN))
         data, fieldnames = self.fetch_endpoint_data(endpoint, params, gsc_client, domain)
@@ -46,9 +47,13 @@ class Component(ComponentBase):
 
     @staticmethod
     def get_gsc_client(client_id_credentials):
-        client_id = client_id_credentials[KEY_CLIENT_ID]
-        client_secret = client_id_credentials[KEY_CLIENT_SECRET]
-        refresh_token = client_id_credentials[KEY_AUTH_DATA][KEY_REFRESH_TOKEN]
+        if client_id_credentials:
+            client_id = client_id_credentials[KEY_CLIENT_ID]
+            client_secret = client_id_credentials[KEY_CLIENT_SECRET]
+            refresh_token = client_id_credentials[KEY_AUTH_DATA][KEY_REFRESH_TOKEN]
+        else:
+            raise UserException(
+                "Component is not authorized, please authorize the app in the authorization configuration ")
         try:
             return GoogleSearchConsoleClient(client_id, client_secret, refresh_token, TOKEN_URI)
         except ClientError as client_error:
@@ -86,6 +91,8 @@ class Component(ComponentBase):
 
     def get_search_analytics_data(self, params, gsc_client, domain):
         search_analytics_dimensions = self.parse_list_from_string(params.get(KEY_SEARCH_ANALYTICS_DIMENSIONS))
+        if not search_analytics_dimensions:
+            raise UserException("Missing Search Analytics dimensions, please fill them in")
         logging.info(f"Fetching data for search analytics for {search_analytics_dimensions} dimensions")
         date_from, date_to = self.get_date_range(params.get(KEY_DATE_FROM),
                                                  params.get(KEY_DATE_TO),
@@ -101,7 +108,7 @@ class Component(ComponentBase):
         try:
             return gsc_client.get_search_analytics_data(date_from, date_to, domain, search_analytics_dimensions)
         except ClientError as client_error:
-            raise UserException(client_error) from client_error
+            raise UserException(client_error.args[0].error_details[0]["message"]) from client_error
 
     @staticmethod
     def parse_list_from_string(string_list):
@@ -139,7 +146,7 @@ class Component(ComponentBase):
         try:
             return gsc_client.get_sitemaps_data(domain)
         except ClientError as client_error:
-            raise UserException(client_error) from client_error
+            raise UserException(client_error.args[0].error_details[0]["message"]) from client_error
 
     def parse_sitemaps_data(self, data):
         parsed_data = []
@@ -205,6 +212,12 @@ class Component(ComponentBase):
         last_day_of_prev_month = date.today().replace(day=1) - timedelta(days=1)
         start_day_of_prev_month = date.today().replace(day=1) - timedelta(days=last_day_of_prev_month.day)
         return start_day_of_prev_month, last_day_of_prev_month
+
+    @staticmethod
+    def validate_table_name(table_name):
+        if not table_name.replace("_", "").isalnum():
+            raise UserException(
+                "Output Table name is not valid, make sure it only contains alphanumeric characters and underscores")
 
 
 if __name__ == "__main__":
