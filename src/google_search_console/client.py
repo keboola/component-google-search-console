@@ -1,9 +1,9 @@
 from google.oauth2.credentials import Credentials
 from retry import retry
 from google.auth.transport import requests
-
 from apiclient import discovery
 from googleapiclient.errors import HttpError
+from google.auth.exceptions import RefreshError
 
 
 class ClientError(Exception):
@@ -27,13 +27,14 @@ class GoogleSearchConsoleClient:
                                   refresh_token=refresh_token,
                                   token_uri=token_uri)
         request = requests.Request()
-        credentials.refresh(request)
-        self.service = discovery.build(
-            serviceName='webmasters',
-            version='v3',
-            credentials=credentials,
-            cache_discovery=False
-        )
+        try:
+            credentials.refresh(request)
+        except RefreshError:
+            raise ClientError("Invalid credentials, please re-authenticate the application")
+        self.service = discovery.build(serviceName='webmasters',
+                                       version='v3',
+                                       credentials=credentials,
+                                       cache_discovery=False)
 
     def get_verified_sites(self):
         site_list = self.service.sites().list().execute()
@@ -56,7 +57,8 @@ class GoogleSearchConsoleClient:
         row_limit = 25000
         start_row = 0
         response_data = []
-        while True:
+        last_page = False
+        while not last_page:
             request["rowLimit"] = row_limit
             request["startRow"] = start_row
             response = self.execute_search_analytics_request(self.service, url, request)
@@ -64,25 +66,21 @@ class GoogleSearchConsoleClient:
                 data = response["rows"]
                 response_data.extend(data)
                 if len(data) != row_limit:
-                    break
+                    last_page = True
                 start_row = start_row + row_limit
             else:
-                break
+                last_page = True
         return response_data
 
     def execute_search_analytics_request(self, service, property_uri, request):
         return self._execute_search_analytics_request(service, property_uri, request)
 
-    @staticmethod
     @retry(RetryableException, tries=3, delay=60, jitter=600)
-    def _execute_search_analytics_request(service, property_uri, request):
+    def _execute_search_analytics_request(self, service, property_uri, request):
         try:
             return service.searchanalytics().query(siteUrl=property_uri, body=request).execute()
         except HttpError as http_error:
-            if http_error.error_details[0]["reason"] in RETRYABLE_ERROR_CODES:
-                raise RetryableException(http_error.error_details[0]["reason"]) from http_error
-            else:
-                raise ClientError(http_error)
+            self._process_exception(http_error)
 
     def get_sitemaps_data(self, url):
         sitemaps = self._get_sitemaps_data(url)
@@ -94,7 +92,11 @@ class GoogleSearchConsoleClient:
             sitemaps = self.service.sitemaps().list(siteUrl=url).execute()["sitemap"]
             return sitemaps
         except HttpError as http_error:
-            if http_error.error_details[0]["reason"] in RETRYABLE_ERROR_CODES:
-                raise RetryableException(http_error.error_details[0]["reason"]) from http_error
-            else:
-                raise ClientError(http_error)
+            self._process_exception(http_error)
+
+    @staticmethod
+    def _process_exception(http_error):
+        if http_error.error_details[0]["reason"] in RETRYABLE_ERROR_CODES:
+            raise RetryableException(http_error.error_details[0]["reason"]) from http_error
+        else:
+            raise ClientError(http_error)
