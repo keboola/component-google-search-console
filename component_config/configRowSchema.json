@@ -78,6 +78,51 @@
       "type": "string",
       "description": "Name of output table in Keboola storage",
       "propertyOrder": 7
+    },
+    "filter_groups": {
+      "type": "array",
+      "options": {
+        "dependencies": {
+          "endpoint": "Search analytics"
+        }
+      },
+      "format": "table",
+      "title": "Filter Groups",
+      "propertyOrder": 10,
+      "items": {
+        "type": "array",
+        "title": "Filter Group",
+        "format": "table",
+        "propertyOrder": 11,
+        "items": {
+          "type": "object",
+          "title": "Filter",
+          "properties": {
+            "dimension": {
+              "title": "Dimension",
+              "type": "string",
+              "propertyOrder": 15
+            },
+            "operator": {
+              "type": "string",
+              "title": "Operator",
+              "enum": [
+                "contains",
+                "equals",
+                "notContains",
+                "notEquals"
+              ],
+              "propertyOrder": 20,
+              "default": "equals"
+            },
+            "expression": {
+              "type": "string",
+              "title": "Expression",
+              "propertyOrder": 30
+            }
+          }
+        }
+      }
     }
   }
 }

@@ -22,4 +22,7 @@ Authorization is done via instant authorization, link Google account
  - Date from (date_from) - [REQ For Search Analytics] Start date of the report eg. 3 days ago
  - Date to (date_to) - [REQ For Search Analytics] End date of the report eg. 1 day ago
  - Output name (out_table_name) - [REQ] Name of output table in Keboola storage
+ - Filters (filters) - [OPT] - list of filter groups:
+      - Filters in a single filter group are grouped by "and", therefore if 2 filters are in a filter group, they must both be satisfied to return data
+      - Filters in separate filter groups work with "or", therefore at least 1 of the filters must be satisfied to return data
 

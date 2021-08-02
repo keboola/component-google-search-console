@@ -16,7 +16,9 @@ KEY_DATE_RANGE = "date_range"
 KEY_CLIENT_ID = "appKey"
 KEY_CLIENT_SECRET = "appSecret"
 KEY_REFRESH_TOKEN = "refresh_token"
+KEY_FILTER_GROUPS = "filter_groups"
 KEY_AUTH_DATA = "data"
+
 TOKEN_URI = "https://oauth2.googleapis.com/token"
 
 SITEMAPS_HEADERS = ["path", "lastSubmitted", "isPending", "isSitemapsIndex", "type", "lastDownloaded", "warnings",
@@ -39,9 +41,10 @@ class Component(ComponentBase):
         self.validate_table_name(out_table_name)
         endpoint = params.get(KEY_ENDPOINT)
         domain = self.set_domain(params.get(KEY_DOMAIN))
-        data, fieldnames = self.fetch_endpoint_data(endpoint, params, gsc_client, domain)
+        filter_groups = params.get(KEY_FILTER_GROUPS, [[]])
+        data, fieldnames = self.fetch_endpoint_data(endpoint, params, gsc_client, domain, filter_groups)
         if data:
-            self.write_results(out_table_name, data, fieldnames)
+            self.write_results(out_table_name, data, fieldnames, domain)
         else:
             logging.warning("No data found!")
 
@@ -65,31 +68,33 @@ class Component(ComponentBase):
             domain = "".join(["sc-domain:", domain])
         return domain
 
-    def fetch_endpoint_data(self, endpoint, params, gsc_client, domain):
+    def fetch_endpoint_data(self, endpoint, params, gsc_client, domain, filter_groups):
         if endpoint == "Search analytics":
-            data, fieldnames = self.get_search_analytics_data(params, gsc_client, domain)
+            data, fieldnames = self.get_search_analytics_data(params, gsc_client, domain, filter_groups)
         elif endpoint == "Sitemaps":
             data, fieldnames = self.get_sitemaps_data(gsc_client, domain)
         else:
             raise ValueError("Endpoint selected does not exist")
         return data, fieldnames
 
-    def write_results(self, out_table_name, data, fieldnames):
+    def write_results(self, out_table_name, data, fieldnames, domain):
         fieldnames.append("date_downloaded")
+        fieldnames.append("domain")
         date_downloaded = date.today()
         out_table = self.create_out_table_definition(name=out_table_name, columns=fieldnames)
-        self.write_results_to_out_table(out_table, data, date_downloaded)
+        self.write_results_to_out_table(out_table, data, date_downloaded, domain)
         self.write_tabledef_manifest(out_table)
 
     @staticmethod
-    def write_results_to_out_table(out_table, data, date_downloaded):
+    def write_results_to_out_table(out_table, data, date_downloaded, domain):
         with open(out_table.full_path, mode='wt', encoding='utf-8', newline='') as out_file:
             writer = csv.DictWriter(out_file, out_table.columns)
             for result in data:
                 result["date_downloaded"] = date_downloaded
+                result["domain"] = domain
                 writer.writerow(result)
 
-    def get_search_analytics_data(self, params, gsc_client, domain):
+    def get_search_analytics_data(self, params, gsc_client, domain, filter_groups):
         search_analytics_dimensions = self.parse_list_from_string(params.get(KEY_SEARCH_ANALYTICS_DIMENSIONS))
         if not search_analytics_dimensions:
             raise UserException("Missing Search Analytics dimensions, please fill them in")
@@ -97,18 +102,42 @@ class Component(ComponentBase):
         date_from, date_to = self.get_date_range(params.get(KEY_DATE_FROM),
                                                  params.get(KEY_DATE_TO),
                                                  params.get(KEY_DATE_RANGE))
-        data = self._get_search_analytics_data(gsc_client, date_from, date_to, domain, search_analytics_dimensions)
+
+        data = []
+        if filter_groups:
+            for filter_group in filter_groups:
+                data.extend(self._get_search_analytics_data(gsc_client, date_from, date_to, domain,
+                                                            search_analytics_dimensions,
+                                                            filter_groups=filter_group))
+        else:
+            data.extend(self._get_search_analytics_data(gsc_client, date_from, date_to, domain,
+                                                        search_analytics_dimensions))
         logging.info("Parsing results")
         if data:
             data, fieldnames = self.parse_search_analytics_data(data, search_analytics_dimensions)
+            data = self.filter_duplicates_from_data(data)
             return data, fieldnames
+        return [], []
 
     @staticmethod
-    def _get_search_analytics_data(gsc_client, date_from, date_to, domain, search_analytics_dimensions):
+    def _get_search_analytics_data(gsc_client, date_from, date_to, domain, search_analytics_dimensions, filter_groups):
         try:
-            return gsc_client.get_search_analytics_data(date_from, date_to, domain, search_analytics_dimensions)
+            data = gsc_client.get_search_analytics_data(date_from, date_to, domain, search_analytics_dimensions,
+                                                        filter_groups)
+            return data
         except ClientError as client_error:
             raise UserException(client_error.args[0].error_details[0]["message"]) from client_error
+
+    @staticmethod
+    def filter_duplicates_from_data(data):
+        seen = set()
+        new_data = []
+        for datum in data:
+            t = tuple(sorted(datum.items()))
+            if t not in seen:
+                seen.add(t)
+                new_data.append(datum)
+        return new_data
 
     @staticmethod
     def parse_list_from_string(string_list):

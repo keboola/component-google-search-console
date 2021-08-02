@@ -45,12 +45,18 @@ class GoogleSearchConsoleClient:
                                and s['siteUrl'][:4] == 'http']
         return verified_sites_urls
 
-    def get_search_analytics_data(self, start_date, end_date, url, dimensions):
+    def get_search_analytics_data(self, start_date, end_date, url, dimensions, filter_groups=[]):
         request = {
             'startDate': str(start_date),
             'endDate': str(end_date),
-            'dimensions': dimensions
+            'dimensions': dimensions,
+            "dimensionFilterGroups": []
         }
+        for filters in filter_groups:
+            request["dimensionFilterGroups"].append({
+                "groupType": "and",
+                "filters": filters
+            })
         return self.get_all_pages(request, url)
 
     def get_all_pages(self, request, url):
