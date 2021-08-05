@@ -4,24 +4,19 @@ from google.auth.transport import requests
 from apiclient import discovery
 from googleapiclient.errors import HttpError
 from google.auth.exceptions import RefreshError
+from .exception import ClientError, RetryableException
+from typing import Dict, List
+from datetime import date
 
-
-class ClientError(Exception):
-    pass
-
-
+API_ROW_LIMIT = 25000
 RETRYABLE_ERROR_CODES = ["concurrentLimitExceeded", "dailyLimitExceeded", "dailyLimitExceededUnreg", "limitExceeded",
                          "quotaExceeded", "rateLimitExceeded", "rateLimitExceededUnreg", "userRateLimitExceeded",
                          "userRateLimitExceededUnreg", "variableTermExpiredDailyExceeded", "variableTermLimitExceeded",
                          "dailyLimitExceeded402", "quotaExceeded402", "servingLimitExceeded"]
 
 
-class RetryableException(Exception):
-    pass
-
-
 class GoogleSearchConsoleClient:
-    def __init__(self, client_id, client_secret, refresh_token, token_uri):
+    def __init__(self, client_id: str, client_secret: str, refresh_token: str, token_uri: str) -> None:
         credentials = Credentials(None, client_id=client_id,
                                   client_secret=client_secret,
                                   refresh_token=refresh_token,
@@ -39,28 +34,25 @@ class GoogleSearchConsoleClient:
     def get_verified_sites(self):
         site_list = self.service.sites().list().execute()
 
-        # Filter for verified websites
         verified_sites_urls = [s['siteUrl'] for s in site_list['siteEntry']
                                if s['permissionLevel'] != 'siteUnverifiedUser'
                                and s['siteUrl'][:4] == 'http']
         return verified_sites_urls
 
-    def get_search_analytics_data(self, start_date, end_date, url, dimensions, filter_groups=[]):
-        request = {
+    def get_search_analytics_data(self, start_date: date, end_date: date, url: str, dimensions: List[str],
+                                  filter_groups: List[Dict] = None) -> List[Dict]:
+        request: Dict = {
             'startDate': str(start_date),
             'endDate': str(end_date),
             'dimensions': dimensions,
             "dimensionFilterGroups": []
         }
         for filters in filter_groups:
-            request["dimensionFilterGroups"].append({
-                "groupType": "and",
-                "filters": filters
-            })
+            request["dimensionFilterGroups"].append({"groupType": "and", "filters": filters})
         return self.get_all_pages(request, url)
 
-    def get_all_pages(self, request, url):
-        row_limit = 25000
+    def get_all_pages(self, request: Dict, url: str) -> List[Dict]:
+        row_limit = API_ROW_LIMIT
         start_row = 0
         response_data = []
         last_page = False
@@ -78,22 +70,22 @@ class GoogleSearchConsoleClient:
                 last_page = True
         return response_data
 
-    def execute_search_analytics_request(self, service, property_uri, request):
+    def execute_search_analytics_request(self, service, property_uri: str, request: Dict) -> Dict:
         return self._execute_search_analytics_request(service, property_uri, request)
 
     @retry(RetryableException, tries=3, delay=60, jitter=600)
-    def _execute_search_analytics_request(self, service, property_uri, request):
+    def _execute_search_analytics_request(self, service, property_uri: str, request: Dict) -> Dict:
         try:
             return service.searchanalytics().query(siteUrl=property_uri, body=request).execute()
         except HttpError as http_error:
             self._process_exception(http_error)
 
-    def get_sitemaps_data(self, url):
+    def get_sitemaps_data(self, url: str) -> List[Dict]:
         sitemaps = self._get_sitemaps_data(url)
         return sitemaps
 
     @retry(RetryableException, tries=3, delay=60, jitter=600)
-    def _get_sitemaps_data(self, url):
+    def _get_sitemaps_data(self, url: str) -> List[Dict]:
         try:
             sitemaps = self.service.sitemaps().list(siteUrl=url).execute()["sitemap"]
             return sitemaps

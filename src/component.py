@@ -3,8 +3,13 @@ import dateparser
 import csv
 from datetime import date
 from datetime import timedelta
+from typing import List
 from keboola.component.base import ComponentBase, UserException
-from google_search_console.client import GoogleSearchConsoleClient, ClientError
+from google_search_console import GoogleSearchConsoleClient, ClientError
+from keboola.component.dao import OauthCredentials
+from typing import Dict
+from typing import Tuple
+from keboola.component.dao import TableDefinition
 
 KEY_DOMAIN = 'domain'
 KEY_OUT_TABLE_NAME = "out_table_name"
@@ -29,27 +34,31 @@ REQUIRED_IMAGE_PARS = []
 
 
 class Component(ComponentBase):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(required_parameters=REQUIRED_PARAMETERS,
                          required_image_parameters=REQUIRED_IMAGE_PARS)
+        self.endpoint: str = ""
+        self.domain: str = ""
+        self.filter_groups: List = []
+        self.out_table_name: str = ""
 
-    def run(self):
+    def run(self) -> None:
         params = self.configuration.parameters
         client_id_credentials = self.configuration.oauth_credentials
         gsc_client = self.get_gsc_client(client_id_credentials)
-        out_table_name = params.get(KEY_OUT_TABLE_NAME)
-        self.validate_table_name(out_table_name)
-        endpoint = params.get(KEY_ENDPOINT)
-        domain = self.set_domain(params.get(KEY_DOMAIN))
-        filter_groups = params.get(KEY_FILTER_GROUPS, [[]])
-        data, fieldnames = self.fetch_endpoint_data(endpoint, params, gsc_client, domain, filter_groups)
+        self.out_table_name = params.get(KEY_OUT_TABLE_NAME)
+        self.validate_table_name(self.out_table_name)
+        self.endpoint = params.get(KEY_ENDPOINT)
+        self.domain = self.get_domain_string(params.get(KEY_DOMAIN))
+        self.filter_groups = params.get(KEY_FILTER_GROUPS, [[]])
+        data, fieldnames = self.fetch_endpoint_data(gsc_client)
         if data:
-            self.write_results(out_table_name, data, fieldnames, domain)
+            self.write_results(data, fieldnames)
         else:
             logging.warning("No data found!")
 
     @staticmethod
-    def get_gsc_client(client_id_credentials):
+    def get_gsc_client(client_id_credentials: OauthCredentials) -> GoogleSearchConsoleClient:
         if client_id_credentials:
             client_id = client_id_credentials[KEY_CLIENT_ID]
             client_secret = client_id_credentials[KEY_CLIENT_SECRET]
@@ -63,73 +72,69 @@ class Component(ComponentBase):
             raise UserException(client_error) from client_error
 
     @staticmethod
-    def set_domain(domain):
+    def get_domain_string(domain: str) -> str:
         if "sc-domain:" not in domain:
             domain = "".join(["sc-domain:", domain])
         return domain
 
-    def fetch_endpoint_data(self, endpoint, params, gsc_client, domain, filter_groups):
-        if endpoint == "Search analytics":
-            data, fieldnames = self.get_search_analytics_data(params, gsc_client, domain, filter_groups)
-        elif endpoint == "Sitemaps":
-            data, fieldnames = self.get_sitemaps_data(gsc_client, domain)
+    def fetch_endpoint_data(self, gsc_client: GoogleSearchConsoleClient) -> Tuple[List[Dict], List[str]]:
+        if self.endpoint == "Search analytics":
+            data, fieldnames = self.get_search_analytics_data(gsc_client)
+        elif self.endpoint == "Sitemaps":
+            data, fieldnames = self.get_sitemaps_data(gsc_client)
         else:
             raise ValueError("Endpoint selected does not exist")
         return data, fieldnames
 
-    def write_results(self, out_table_name, data, fieldnames, domain):
+    def write_results(self, data: List[Dict], fieldnames: List[str]) -> None:
         fieldnames.append("date_downloaded")
         fieldnames.append("domain")
         date_downloaded = date.today()
-        out_table = self.create_out_table_definition(name=out_table_name, columns=fieldnames)
-        self.write_results_to_out_table(out_table, data, date_downloaded, domain)
+        out_table = self.create_out_table_definition(name=self.out_table_name, columns=fieldnames)
+        self.write_results_to_out_table(out_table, data, date_downloaded)
         self.write_tabledef_manifest(out_table)
 
-    @staticmethod
-    def write_results_to_out_table(out_table, data, date_downloaded, domain):
+    def write_results_to_out_table(self, out_table: TableDefinition, data: List[Dict], date_downloaded: date) -> None:
         with open(out_table.full_path, mode='wt', encoding='utf-8', newline='') as out_file:
             writer = csv.DictWriter(out_file, out_table.columns)
             for result in data:
                 result["date_downloaded"] = date_downloaded
-                result["domain"] = domain
+                result["domain"] = self.domain
                 writer.writerow(result)
 
-    def get_search_analytics_data(self, params, gsc_client, domain, filter_groups):
+    def get_search_analytics_data(self, gsc_client: GoogleSearchConsoleClient) -> Tuple[List[Dict], List[str]]:
+        params = self.configuration.parameters
         search_analytics_dimensions = self.parse_list_from_string(params.get(KEY_SEARCH_ANALYTICS_DIMENSIONS))
         if not search_analytics_dimensions:
             raise UserException("Missing Search Analytics dimensions, please fill them in")
+
         logging.info(f"Fetching data for search analytics for {search_analytics_dimensions} dimensions")
         date_from, date_to = self.get_date_range(params.get(KEY_DATE_FROM),
                                                  params.get(KEY_DATE_TO),
                                                  params.get(KEY_DATE_RANGE))
 
         data = []
-        if filter_groups:
-            for filter_group in filter_groups:
-                data.extend(self._get_search_analytics_data(gsc_client, date_from, date_to, domain,
-                                                            search_analytics_dimensions,
-                                                            filter_groups=filter_group))
-        else:
-            data.extend(self._get_search_analytics_data(gsc_client, date_from, date_to, domain,
-                                                        search_analytics_dimensions))
+        fieldnames = []
+        for filter_group in self.filter_groups:
+            data.extend(self._get_search_analytics_data(gsc_client, date_from, date_to, search_analytics_dimensions,
+                                                        filter_group))
         logging.info("Parsing results")
         if data:
             data, fieldnames = self.parse_search_analytics_data(data, search_analytics_dimensions)
             data = self.filter_duplicates_from_data(data)
-            return data, fieldnames
-        return [], []
+        return data, fieldnames
 
-    @staticmethod
-    def _get_search_analytics_data(gsc_client, date_from, date_to, domain, search_analytics_dimensions, filter_groups):
+    def _get_search_analytics_data(self, gsc_client: GoogleSearchConsoleClient, date_from: date, date_to: date,
+                                   search_analytics_dimensions: List[str], filter_group: List[str]) -> List[Dict]:
         try:
-            data = gsc_client.get_search_analytics_data(date_from, date_to, domain, search_analytics_dimensions,
-                                                        filter_groups)
+            data = gsc_client.get_search_analytics_data(date_from, date_to, self.domain, search_analytics_dimensions,
+                                                        filter_group)
             return data
         except ClientError as client_error:
             raise UserException(client_error.args[0].error_details[0]["message"]) from client_error
 
     @staticmethod
-    def filter_duplicates_from_data(data):
+    def filter_duplicates_from_data(data: List[Dict]) -> List[Dict]:
         seen = set()
         new_data = []
         for datum in data:
@@ -140,10 +145,10 @@ class Component(ComponentBase):
         return new_data
 
     @staticmethod
-    def parse_list_from_string(string_list):
+    def parse_list_from_string(string_list: str) -> List[str]:
         return [word.strip() for word in string_list.split(",") if len(word) > 1]
 
-    def parse_search_analytics_data(self, data, dimensions):
+    def parse_search_analytics_data(self, data: List[Dict], dimensions: List[str]) -> Tuple[List[Dict], List[str]]:
         parsed_data = []
         fieldnames = []
         for row in data:
@@ -153,7 +158,7 @@ class Component(ComponentBase):
         return parsed_data, fieldnames
 
     @staticmethod
-    def _parse_search_analytics_row(row, dimensions):
+    def _parse_search_analytics_row(row: Dict, dimensions: List[str]) -> Dict:
         parsed_row = {}
         for i, dimension in enumerate(dimensions):
             parsed_row[dimension] = row["keys"][i]
@@ -163,35 +168,34 @@ class Component(ComponentBase):
             parsed_row[key] = row[key]
         return parsed_row
 
-    def get_sitemaps_data(self, gsc_client, domain):
+    def get_sitemaps_data(self, gsc_client: GoogleSearchConsoleClient) -> Tuple[List[Dict], List[str]]:
         logging.info("Fetching sitemaps data")
-        data = self._get_sitemaps_data(gsc_client, domain)
+        data = self._get_sitemaps_data(gsc_client)
         logging.info("Parsing results")
         data, fieldnames = self.parse_sitemaps_data(data)
         return data, fieldnames
 
-    @staticmethod
-    def _get_sitemaps_data(gsc_client, domain):
+    def _get_sitemaps_data(self, gsc_client: GoogleSearchConsoleClient) -> List[Dict]:
         try:
-            return gsc_client.get_sitemaps_data(domain)
+            return gsc_client.get_sitemaps_data(self.domain)
         except ClientError as client_error:
             raise UserException(client_error.args[0].error_details[0]["message"]) from client_error
 
-    def parse_sitemaps_data(self, data):
+    def parse_sitemaps_data(self, data: List[Dict]) -> Tuple[List[Dict], List[str]]:
         parsed_data = []
         for row in data:
             parsed_data.extend(self.parse_sitemaps_row(row))
         fieldnames = list(parsed_data[0].keys())
         return parsed_data, fieldnames
 
-    def parse_sitemaps_row(self, row):
+    def parse_sitemaps_row(self, row: Dict) -> List[Dict]:
         if "contents" in row:
             return self._parse_sitemap_content_row(row)
         else:
             return self._parse_sitemap_error_row(row)
 
     @staticmethod
-    def _parse_sitemap_content_row(row):
+    def _parse_sitemap_content_row(row: Dict) -> List[Dict]:
         content_rows = []
         for content in row["contents"]:
             parsed_row = {}
@@ -204,7 +208,7 @@ class Component(ComponentBase):
         return content_rows
 
     @staticmethod
-    def _parse_sitemap_error_row(row):
+    def _parse_sitemap_error_row(row: Dict) -> List[Dict]:
         error_rows = []
         parsed_row = {}
         for sitemap_header in SITEMAPS_HEADERS:
@@ -215,7 +219,7 @@ class Component(ComponentBase):
         error_rows.append(parsed_row)
         return error_rows
 
-    def get_date_range(self, date_from, date_to, date_range):
+    def get_date_range(self, date_from: str, date_to: str, date_range: str) -> Tuple[date, date]:
         if date_range == "Last week (sun-sat)":
             date_from, date_to = self.get_last_week_dates()
         elif date_range == "Last month":
@@ -229,7 +233,7 @@ class Component(ComponentBase):
         return date_from, date_to
 
     @staticmethod
-    def get_last_week_dates():
+    def get_last_week_dates() -> Tuple[date, date]:
         today = date.today()
         offset = (today.weekday() - 5) % 7
         last_week_saturday = today - timedelta(days=offset)
@@ -237,13 +241,13 @@ class Component(ComponentBase):
         return last_week_sunday, last_week_saturday
 
     @staticmethod
-    def get_last_month_dates():
+    def get_last_month_dates() -> Tuple[date, date]:
         last_day_of_prev_month = date.today().replace(day=1) - timedelta(days=1)
         start_day_of_prev_month = date.today().replace(day=1) - timedelta(days=last_day_of_prev_month.day)
         return start_day_of_prev_month, last_day_of_prev_month
 
     @staticmethod
-    def validate_table_name(table_name):
+    def validate_table_name(table_name: str) -> None:
         if not table_name.replace("_", "").isalnum():
             raise UserException(
                 "Output Table name is not valid, make sure it only contains alphanumeric characters and underscores")
