@@ -80,7 +80,7 @@ class Component(ComponentBase):
             domain = "".join(["sc-domain:", domain])
         return domain
 
-    def fetch_endpoint_data(self, gsc_client: GoogleSearchConsoleClient) -> Tuple[List[Dict], List[str]]
+    def fetch_endpoint_data(self, gsc_client: GoogleSearchConsoleClient) -> Tuple[List[Dict], List[str]]:
         # TODO: will this scale memory-wise? Is it save to process everything in-memory?
 
         if self.endpoint == "Search analytics":
