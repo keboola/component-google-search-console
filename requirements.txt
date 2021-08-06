@@ -3,4 +3,5 @@ keboola.component==1.1.0
 freezegun~=1.1.0
 dateparser~=1.0.0
 retry~=0.9.2
+# TODO: why 2.9.0 if 2.15.0 is available?
 google-api-python-client~=2.9.0

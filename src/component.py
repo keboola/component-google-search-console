@@ -24,6 +24,8 @@ KEY_REFRESH_TOKEN = "refresh_token"
 KEY_FILTER_GROUPS = "filter_groups"
 KEY_AUTH_DATA = "data"
 
+# TODO: this should be part of the client module and token_uri should use it as default parameter
+# is it ever going to change?
 TOKEN_URI = "https://oauth2.googleapis.com/token"
 
 SITEMAPS_HEADERS = ["path", "lastSubmitted", "isPending", "isSitemapsIndex", "type", "lastDownloaded", "warnings",
@@ -46,6 +48,7 @@ class Component(ComponentBase):
         params = self.configuration.parameters
         client_id_credentials = self.configuration.oauth_credentials
         gsc_client = self.get_gsc_client(client_id_credentials)
+        # TODO: Any reason for these to be initialized outside the constructor?
         self.out_table_name = params.get(KEY_OUT_TABLE_NAME)
         self.validate_table_name(self.out_table_name)
         self.endpoint = params.get(KEY_ENDPOINT)
@@ -77,13 +80,17 @@ class Component(ComponentBase):
             domain = "".join(["sc-domain:", domain])
         return domain
 
-    def fetch_endpoint_data(self, gsc_client: GoogleSearchConsoleClient) -> Tuple[List[Dict], List[str]]:
+    def fetch_endpoint_data(self, gsc_client: GoogleSearchConsoleClient) -> Tuple[List[Dict], List[str]]
+        # TODO: will this scale memory-wise? Is it save to process everything in-memory?
+
         if self.endpoint == "Search analytics":
             data, fieldnames = self.get_search_analytics_data(gsc_client)
         elif self.endpoint == "Sitemaps":
             data, fieldnames = self.get_sitemaps_data(gsc_client)
         else:
             raise ValueError("Endpoint selected does not exist")
+        # TODO: Extracting fieldnames in both methods seems redundant, they're contained within the dictionary anyway
+        # This could be handled on the writer side, even if the fields were not consistent
         return data, fieldnames
 
     def write_results(self, data: List[Dict], fieldnames: List[str]) -> None:
@@ -220,6 +227,10 @@ class Component(ComponentBase):
         return error_rows
 
     def get_date_range(self, date_from: str, date_to: str, date_range: str) -> Tuple[date, date]:
+        # TODO: I don't like this much. input variables are reused and outputted in return statement holding completely
+        # different types/things which is congnitively confusing. There is no validation of date_range parameter,
+        # so if the users enters something not supported it will return
+        # the original input variables date_* as return values
         if date_range == "Last week (sun-sat)":
             date_from, date_to = self.get_last_week_dates()
         elif date_range == "Last month":
