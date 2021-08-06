@@ -125,7 +125,7 @@ class Component(ComponentBase):
         return data, fieldnames
 
     def _get_search_analytics_data(self, gsc_client: GoogleSearchConsoleClient, date_from: date, date_to: date,
-                                   search_analytics_dimensions: List[str], filter_group: List[str]) -> List[Dict]:
+                                   search_analytics_dimensions: List[str], filter_group: List[dict]) -> List[Dict]:
         try:
             data = gsc_client.get_search_analytics_data(date_from, date_to, self.domain, search_analytics_dimensions,
                                                         filter_group)
