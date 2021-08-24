@@ -25,4 +25,90 @@ Authorization is done via instant authorization, link Google account
  - Filters (filters) - [OPT] - list of filter groups:
       - Filters in a single filter group are grouped by "and", therefore if 2 filters are in a filter group, they must both be satisfied to return data
       - Filters in separate filter groups work with "or", therefore at least 1 of the filters must be satisfied to return data
+   
 
+
+### Sample configuration parameters
+
+```json
+{
+  "parameters": {
+    "date_to": "3 days ago",
+    "date_from": "5 days ago",
+    "date_range": "Custom",
+    "endpoint": "Search analytics",
+    "search_analytics_dimensions": "page, query, date",
+    "domain": "domain.cz",
+    "out_table_name": "search_analytics",
+    "filter_groups": [
+      [
+        {
+          "dimension": "query",
+          "operator": "contains",
+          "expression": "x"
+        }
+      ],
+      [
+        {
+          "dimension": "query",
+          "operator": "contains",
+          "expression": "y"
+        }
+      ]
+    ]
+  },
+  "authorization": {
+    "oauth_api": {
+      "id": "OAUTH_API_ID",
+      "credentials": {
+        "id": "main",
+        "authorizedFor": "Myself",
+        "creator": {
+          "id": "1234",
+          "description": "me@keboola.com"
+        },
+        "created": "2016-01-31 00:13:30",
+        "#data": "{\"refresh_token\":\"TOKENHERE\"}",
+        "oauthVersion": "2.0",
+        "appKey": "APIKEY.apps.googleusercontent.com",
+        "#appSecret": "SECRET"
+      }
+    }
+  }
+}
+```
+
+Development
+-----------
+
+If required, change local data folder (the `CUSTOM_FOLDER` placeholder) path to
+your custom path in the docker-compose file:
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    volumes:
+      - ./:/code
+      - ./CUSTOM_FOLDER:/data
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Clone this repository, init the workspace and run the component with following
+command:
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+git clone repo_path my-new-component
+cd my-new-component
+docker-compose build
+docker-compose run --rm dev
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Run the test suite and lint check using this command:
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+docker-compose run --rm test
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Integration
+===========
+
+For information about deployment and integration with KBC, please refer to the
+[deployment section of developers
+documentation](https://developers.keboola.com/extend/component/deployment/)

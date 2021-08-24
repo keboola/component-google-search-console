@@ -24,8 +24,6 @@ KEY_REFRESH_TOKEN = "refresh_token"
 KEY_FILTER_GROUPS = "filter_groups"
 KEY_AUTH_DATA = "data"
 
-TOKEN_URI = "https://oauth2.googleapis.com/token"
-
 SITEMAPS_HEADERS = ["path", "lastSubmitted", "isPending", "isSitemapsIndex", "type", "lastDownloaded", "warnings",
                     "errors"]
 
@@ -37,23 +35,19 @@ class Component(ComponentBase):
     def __init__(self) -> None:
         super().__init__(required_parameters=REQUIRED_PARAMETERS,
                          required_image_parameters=REQUIRED_IMAGE_PARS)
-        self.endpoint: str = ""
-        self.domain: str = ""
-        self.filter_groups: List = []
-        self.out_table_name: str = ""
-
-    def run(self) -> None:
         params = self.configuration.parameters
-        client_id_credentials = self.configuration.oauth_credentials
-        gsc_client = self.get_gsc_client(client_id_credentials)
         self.out_table_name = params.get(KEY_OUT_TABLE_NAME)
         self.validate_table_name(self.out_table_name)
         self.endpoint = params.get(KEY_ENDPOINT)
         self.domain = self.get_domain_string(params.get(KEY_DOMAIN))
         self.filter_groups = params.get(KEY_FILTER_GROUPS, [[]])
-        data, fieldnames = self.fetch_endpoint_data(gsc_client)
+
+    def run(self) -> None:
+        client_id_credentials = self.configuration.oauth_credentials
+        gsc_client = self.get_gsc_client(client_id_credentials)
+        data = self.fetch_endpoint_data(gsc_client)
         if data:
-            self.write_results(data, fieldnames)
+            self.write_results(data)
         else:
             logging.warning("No data found!")
 
@@ -67,7 +61,7 @@ class Component(ComponentBase):
             raise UserException(
                 "Component is not authorized, please authorize the app in the authorization configuration ")
         try:
-            return GoogleSearchConsoleClient(client_id, client_secret, refresh_token, TOKEN_URI)
+            return GoogleSearchConsoleClient(client_id, client_secret, refresh_token)
         except ClientError as client_error:
             raise UserException(client_error) from client_error
 
@@ -77,16 +71,17 @@ class Component(ComponentBase):
             domain = "".join(["sc-domain:", domain])
         return domain
 
-    def fetch_endpoint_data(self, gsc_client: GoogleSearchConsoleClient) -> Tuple[List[Dict], List[str]]:
+    def fetch_endpoint_data(self, gsc_client: GoogleSearchConsoleClient) -> List[Dict]:
+        # Change to generator if memory issue
         if self.endpoint == "Search analytics":
-            data, fieldnames = self.get_search_analytics_data(gsc_client)
+            return self.get_search_analytics_data(gsc_client)
         elif self.endpoint == "Sitemaps":
-            data, fieldnames = self.get_sitemaps_data(gsc_client)
+            return self.get_sitemaps_data(gsc_client)
         else:
             raise ValueError("Endpoint selected does not exist")
-        return data, fieldnames
 
-    def write_results(self, data: List[Dict], fieldnames: List[str]) -> None:
+    def write_results(self, data: List[Dict]) -> None:
+        fieldnames = list(data[0].keys())
         fieldnames.append("date_downloaded")
         fieldnames.append("domain")
         date_downloaded = date.today()
@@ -102,7 +97,7 @@ class Component(ComponentBase):
                 result["domain"] = self.domain
                 writer.writerow(result)
 
-    def get_search_analytics_data(self, gsc_client: GoogleSearchConsoleClient) -> Tuple[List[Dict], List[str]]:
+    def get_search_analytics_data(self, gsc_client: GoogleSearchConsoleClient) -> List[Dict]:
         params = self.configuration.parameters
         search_analytics_dimensions = self.parse_list_from_string(params.get(KEY_SEARCH_ANALYTICS_DIMENSIONS))
         if not search_analytics_dimensions:
@@ -114,18 +109,17 @@ class Component(ComponentBase):
                                                  params.get(KEY_DATE_RANGE))
 
         data = []
-        fieldnames = []
         for filter_group in self.filter_groups:
             data.extend(self._get_search_analytics_data(gsc_client, date_from, date_to, search_analytics_dimensions,
                                                         filter_group))
         logging.info("Parsing results")
         if data:
-            data, fieldnames = self.parse_search_analytics_data(data, search_analytics_dimensions)
+            data = self.parse_search_analytics_data(data, search_analytics_dimensions)
             data = self.filter_duplicates_from_data(data)
-        return data, fieldnames
+        return data
 
     def _get_search_analytics_data(self, gsc_client: GoogleSearchConsoleClient, date_from: date, date_to: date,
-                                   search_analytics_dimensions: List[str], filter_group: List[str]) -> List[Dict]:
+                                   search_analytics_dimensions: List[str], filter_group: List[dict]) -> List[Dict]:
         try:
             data = gsc_client.get_search_analytics_data(date_from, date_to, self.domain, search_analytics_dimensions,
                                                         filter_group)
@@ -148,14 +142,12 @@ class Component(ComponentBase):
     def parse_list_from_string(string_list: str) -> List[str]:
         return [word.strip() for word in string_list.split(",") if len(word) > 1]
 
-    def parse_search_analytics_data(self, data: List[Dict], dimensions: List[str]) -> Tuple[List[Dict], List[str]]:
+    def parse_search_analytics_data(self, data: List[Dict], dimensions: List[str]) -> List[Dict]:
         parsed_data = []
-        fieldnames = []
+
         for row in data:
             parsed_data.append(self._parse_search_analytics_row(row, dimensions))
-        if len(parsed_data) > 0:
-            fieldnames = list(parsed_data[0].keys())
-        return parsed_data, fieldnames
+        return parsed_data
 
     @staticmethod
     def _parse_search_analytics_row(row: Dict, dimensions: List[str]) -> Dict:
@@ -168,12 +160,12 @@ class Component(ComponentBase):
             parsed_row[key] = row[key]
         return parsed_row
 
-    def get_sitemaps_data(self, gsc_client: GoogleSearchConsoleClient) -> Tuple[List[Dict], List[str]]:
+    def get_sitemaps_data(self, gsc_client: GoogleSearchConsoleClient) -> List[Dict]:
         logging.info("Fetching sitemaps data")
         data = self._get_sitemaps_data(gsc_client)
         logging.info("Parsing results")
-        data, fieldnames = self.parse_sitemaps_data(data)
-        return data, fieldnames
+        data = self.parse_sitemaps_data(data)
+        return data
 
     def _get_sitemaps_data(self, gsc_client: GoogleSearchConsoleClient) -> List[Dict]:
         try:
@@ -181,12 +173,11 @@ class Component(ComponentBase):
         except ClientError as client_error:
             raise UserException(client_error.args[0].error_details[0]["message"]) from client_error
 
-    def parse_sitemaps_data(self, data: List[Dict]) -> Tuple[List[Dict], List[str]]:
+    def parse_sitemaps_data(self, data: List[Dict]) -> List[Dict]:
         parsed_data = []
         for row in data:
             parsed_data.extend(self.parse_sitemaps_row(row))
-        fieldnames = list(parsed_data[0].keys())
-        return parsed_data, fieldnames
+        return parsed_data
 
     def parse_sitemaps_row(self, row: Dict) -> List[Dict]:
         if "contents" in row:
@@ -221,16 +212,18 @@ class Component(ComponentBase):
 
     def get_date_range(self, date_from: str, date_to: str, date_range: str) -> Tuple[date, date]:
         if date_range == "Last week (sun-sat)":
-            date_from, date_to = self.get_last_week_dates()
+            start_date, end_date = self.get_last_week_dates()
         elif date_range == "Last month":
-            date_from, date_to = self.get_last_month_dates()
+            start_date, end_date = self.get_last_month_dates()
         elif date_range == "Custom":
             try:
-                date_from = dateparser.parse(date_from).date()
-                date_to = dateparser.parse(date_to).date()
+                start_date = dateparser.parse(date_from).date()
+                end_date = dateparser.parse(date_to).date()
             except AttributeError:
                 raise UserException("Date input is invalid, please recheck the documentation on valid inputs")
-        return date_from, date_to
+        else:
+            raise UserException(f"Date range type : {date_range} is invalid")
+        return start_date, end_date
 
     @staticmethod
     def get_last_week_dates() -> Tuple[date, date]:
