@@ -16,7 +16,8 @@ RETRYABLE_ERROR_CODES = ["concurrentLimitExceeded", "dailyLimitExceeded", "daily
 
 
 class GoogleSearchConsoleClient:
-    def __init__(self, client_id: str, client_secret: str, refresh_token: str, token_uri: str) -> None:
+    def __init__(self, client_id: str, client_secret: str, refresh_token: str,
+                 token_uri: str = "https://oauth2.googleapis.com/token") -> None:
         credentials = Credentials(None, client_id=client_id,
                                   client_secret=client_secret,
                                   refresh_token=refresh_token,
