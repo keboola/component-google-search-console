@@ -115,20 +115,18 @@ class Component(ComponentBase):
         data = []
         for filter_group in self.filter_groups:
             data.extend(self._get_search_analytics_data(gsc_client, date_from, date_to, search_analytics_dimensions,
-                                                        filter_group))
+                                                        filter_group=filter_group))
+        if not self.filter_groups:
+            data.extend(self._get_search_analytics_data(gsc_client, date_from, date_to, search_analytics_dimensions))
 
-        logging.info("Pre-parsed data for debugging")
-        logging.info(data)
         logging.info("Parsing results")
         if data:
             data = self.parse_search_analytics_data(data, search_analytics_dimensions)
             data = self.filter_duplicates_from_data(data)
-        logging.info("Parsed data for debugging")
-        logging.info(data)
         return data
 
     def _get_search_analytics_data(self, gsc_client: GoogleSearchConsoleClient, date_from: date, date_to: date,
-                                   search_analytics_dimensions: List[str], filter_group: List[dict]) -> List[Dict]:
+                                   search_analytics_dimensions: List[str], filter_group: List[dict] = []) -> List[Dict]:
         try:
             data = gsc_client.get_search_analytics_data(date_from, date_to, self.domain, search_analytics_dimensions,
                                                         filter_group)
