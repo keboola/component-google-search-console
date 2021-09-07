@@ -7,6 +7,7 @@ from google.auth.exceptions import RefreshError
 from .exception import ClientError, RetryableException
 from typing import Dict, List
 from datetime import date
+import logging
 
 API_ROW_LIMIT = 25000
 RETRYABLE_ERROR_CODES = ["concurrentLimitExceeded", "dailyLimitExceeded", "dailyLimitExceededUnreg", "limitExceeded",
@@ -50,6 +51,7 @@ class GoogleSearchConsoleClient:
         }
         for filters in filter_groups:
             request["dimensionFilterGroups"].append({"groupType": "and", "filters": filters})
+        logging.info(f"Sending request {request}")
         return self.get_all_pages(request, url)
 
     def get_all_pages(self, request: Dict, url: str) -> List[Dict]:
@@ -78,6 +80,7 @@ class GoogleSearchConsoleClient:
     @retry(RetryableException, tries=3, delay=60, jitter=600)
     def _execute_search_analytics_request(self, service, property_uri: str, request: Dict) -> Dict:
         try:
+            logging.info(f"DEBUGGING property_uri : {property_uri}, request: {request}")
             return service.searchanalytics().query(siteUrl=property_uri, body=request).execute()
         except HttpError as http_error:
             self._process_exception(http_error)
