@@ -103,20 +103,28 @@ class Component(ComponentBase):
         if not search_analytics_dimensions:
             raise UserException("Missing Search Analytics dimensions, please fill them in")
 
-        logging.info(
-            f"Fetching data for search analytics for {search_analytics_dimensions} dimensions for domain {self.domain}")
         date_from, date_to = self.get_date_range(params.get(KEY_DATE_FROM),
                                                  params.get(KEY_DATE_TO),
                                                  params.get(KEY_DATE_RANGE))
+
+        logging.info(
+            f"Fetching data for search analytics for {search_analytics_dimensions} dimensions for domain {self.domain},"
+            f"for dates from {date_from} to {date_to}")
+        logging.info(f"Filters set as {self.filter_groups}")
 
         data = []
         for filter_group in self.filter_groups:
             data.extend(self._get_search_analytics_data(gsc_client, date_from, date_to, search_analytics_dimensions,
                                                         filter_group))
+
+        logging.info("Pre-parsed data for debugging")
+        logging.info(data)
         logging.info("Parsing results")
         if data:
             data = self.parse_search_analytics_data(data, search_analytics_dimensions)
             data = self.filter_duplicates_from_data(data)
+        logging.info("Parsed data for debugging")
+        logging.info(data)
         return data
 
     def _get_search_analytics_data(self, gsc_client: GoogleSearchConsoleClient, date_from: date, date_to: date,

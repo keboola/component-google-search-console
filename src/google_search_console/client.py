@@ -61,6 +61,7 @@ class GoogleSearchConsoleClient:
             request["rowLimit"] = row_limit
             request["startRow"] = start_row
             response = self.execute_search_analytics_request(self.service, url, request)
+            print(f"DEBUGGING PAGING RESPONSE startrow {start_row}, response {response}")
             if "rows" in response:
                 data = response["rows"]
                 response_data.extend(data)
