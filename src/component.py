@@ -103,7 +103,8 @@ class Component(ComponentBase):
         if not search_analytics_dimensions:
             raise UserException("Missing Search Analytics dimensions, please fill them in")
 
-        logging.info(f"Fetching data for search analytics for {search_analytics_dimensions} dimensions")
+        logging.info(
+            f"Fetching data for search analytics for {search_analytics_dimensions} dimensions for domain {self.domain}")
         date_from, date_to = self.get_date_range(params.get(KEY_DATE_FROM),
                                                  params.get(KEY_DATE_TO),
                                                  params.get(KEY_DATE_RANGE))

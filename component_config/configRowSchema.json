@@ -31,7 +31,7 @@
           "endpoint": "Search analytics"
         }
       },
-      "description": "List of search analytics dimensions eg. page, query, date",
+      "description": "Comma separated list of search analytics dimensions eg. page, query, date",
       "propertyOrder": 3
     },
     "date_range": {
