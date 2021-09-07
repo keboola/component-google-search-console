@@ -103,16 +103,22 @@ class Component(ComponentBase):
         if not search_analytics_dimensions:
             raise UserException("Missing Search Analytics dimensions, please fill them in")
 
-        logging.info(
-            f"Fetching data for search analytics for {search_analytics_dimensions} dimensions for domain {self.domain}")
         date_from, date_to = self.get_date_range(params.get(KEY_DATE_FROM),
                                                  params.get(KEY_DATE_TO),
                                                  params.get(KEY_DATE_RANGE))
 
+        logging.info(
+            f"Fetching data for search analytics for {search_analytics_dimensions} dimensions for domain {self.domain},"
+            f"for dates from {date_from} to {date_to}")
+        logging.info(f"Filters set as {self.filter_groups}")
+
         data = []
         for filter_group in self.filter_groups:
             data.extend(self._get_search_analytics_data(gsc_client, date_from, date_to, search_analytics_dimensions,
-                                                        filter_group))
+                                                        filter_group=filter_group))
+        if not self.filter_groups:
+            data.extend(self._get_search_analytics_data(gsc_client, date_from, date_to, search_analytics_dimensions))
+
         logging.info("Parsing results")
         if data:
             data = self.parse_search_analytics_data(data, search_analytics_dimensions)
@@ -120,7 +126,7 @@ class Component(ComponentBase):
         return data
 
     def _get_search_analytics_data(self, gsc_client: GoogleSearchConsoleClient, date_from: date, date_to: date,
-                                   search_analytics_dimensions: List[str], filter_group: List[dict]) -> List[Dict]:
+                                   search_analytics_dimensions: List[str], filter_group: List[dict] = []) -> List[Dict]:
         try:
             data = gsc_client.get_search_analytics_data(date_from, date_to, self.domain, search_analytics_dimensions,
                                                         filter_group)
