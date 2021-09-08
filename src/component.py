@@ -22,6 +22,8 @@ KEY_CLIENT_SECRET = "appSecret"
 KEY_REFRESH_TOKEN = "refresh_token"
 KEY_FILTER_GROUPS = "filter_groups"
 KEY_AUTH_DATA = "data"
+KEY_LOADING_OPTIONS = "loading_options"
+KEY_LOADING_OPTIONS_INCREMENTAL = "incremental"
 
 SITEMAPS_HEADERS = ["path", "lastSubmitted", "isPending", "isSitemapsIndex", "type", "lastDownloaded", "warnings",
                     "errors"]
@@ -58,10 +60,11 @@ class Component(ComponentBase):
     def fetch_and_write_search_analytics_data(self, gsc_client: GoogleSearchConsoleClient) -> None:
         params = self.configuration.parameters
         search_analytics_dimensions = self.parse_list_from_string(params.get(KEY_SEARCH_ANALYTICS_DIMENSIONS))
+        incremental = params.get(KEY_LOADING_OPTIONS).get(KEY_LOADING_OPTIONS_INCREMENTAL)
         date_downloaded = date.today()
         table = self.create_out_table_definition(self.out_table_name,
                                                  primary_key=search_analytics_dimensions,
-                                                 incremental=True,
+                                                 incremental=incremental,
                                                  is_sliced=True)
         self.create_sliced_directory(table.full_path)
         fieldnames = []
@@ -106,8 +109,12 @@ class Component(ComponentBase):
         fieldnames.append("date_downloaded")
         fieldnames.append("domain")
         date_downloaded = date.today()
-        out_table = self.create_out_table_definition(name=self.out_table_name, columns=fieldnames)
-        self.write_results_to_out_table(out_table, data, date_downloaded)
+        params = self.configuration.parameters
+        incremental = params.get(KEY_LOADING_OPTIONS).get(KEY_LOADING_OPTIONS_INCREMENTAL)
+        out_table = self.create_out_table_definition(name=self.out_table_name,
+                                                     columns=fieldnames,
+                                                     incremental=incremental)
+        self.write_results_to_out_table(out_table.full_path, fieldnames, data, date_downloaded)
         self.write_tabledef_manifest(out_table)
 
     def write_results_to_out_table(self, file_path: str, fieldnames: List[str], data: List[Dict],
