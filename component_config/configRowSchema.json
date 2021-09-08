@@ -124,13 +124,18 @@
         }
       }
     },
-        "loading_options": {
+    "loading_options": {
       "type": "object",
       "title": "Loading Options",
       "propertyOrder": 100,
       "required": [
         "incremental"
       ],
+      "options": {
+        "dependencies": {
+          "endpoint": "Search analytics"
+        }
+      },
       "properties": {
         "incremental": {
           "type": "integer",

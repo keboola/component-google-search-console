@@ -60,7 +60,7 @@ class Component(ComponentBase):
     def fetch_and_write_search_analytics_data(self, gsc_client: GoogleSearchConsoleClient) -> None:
         params = self.configuration.parameters
         search_analytics_dimensions = self.parse_list_from_string(params.get(KEY_SEARCH_ANALYTICS_DIMENSIONS))
-        incremental = params.get(KEY_LOADING_OPTIONS).get(KEY_LOADING_OPTIONS_INCREMENTAL)
+        incremental = params.get(KEY_LOADING_OPTIONS, {}).get(KEY_LOADING_OPTIONS_INCREMENTAL, 0)
         date_downloaded = date.today()
         table = self.create_out_table_definition(self.out_table_name,
                                                  primary_key=search_analytics_dimensions,
@@ -109,11 +109,8 @@ class Component(ComponentBase):
         fieldnames.append("date_downloaded")
         fieldnames.append("domain")
         date_downloaded = date.today()
-        params = self.configuration.parameters
-        incremental = params.get(KEY_LOADING_OPTIONS).get(KEY_LOADING_OPTIONS_INCREMENTAL)
         out_table = self.create_out_table_definition(name=self.out_table_name,
-                                                     columns=fieldnames,
-                                                     incremental=incremental)
+                                                     columns=fieldnames)
         self.write_results_to_out_table(out_table.full_path, fieldnames, data, date_downloaded)
         self.write_tabledef_manifest(out_table)
 
