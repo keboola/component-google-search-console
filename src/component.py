@@ -2,14 +2,13 @@ import logging
 import dateparser
 import csv
 from datetime import date
+from os import path, mkdir
 from datetime import timedelta
 from typing import List
 from keboola.component.base import ComponentBase, UserException
 from google_search_console import GoogleSearchConsoleClient, ClientError
 from keboola.component.dao import OauthCredentials
-from typing import Dict
-from typing import Tuple
-from keboola.component.dao import TableDefinition
+from typing import Dict, Tuple, Generator
 
 KEY_DOMAIN = 'domain'
 KEY_OUT_TABLE_NAME = "out_table_name"
@@ -23,6 +22,8 @@ KEY_CLIENT_SECRET = "appSecret"
 KEY_REFRESH_TOKEN = "refresh_token"
 KEY_FILTER_GROUPS = "filter_groups"
 KEY_AUTH_DATA = "data"
+KEY_LOADING_OPTIONS = "loading_options"
+KEY_LOADING_OPTIONS_INCREMENTAL = "incremental"
 
 SITEMAPS_HEADERS = ["path", "lastSubmitted", "isPending", "isSitemapsIndex", "type", "lastDownloaded", "warnings",
                     "errors"]
@@ -45,11 +46,43 @@ class Component(ComponentBase):
     def run(self) -> None:
         client_id_credentials = self.configuration.oauth_credentials
         gsc_client = self.get_gsc_client(client_id_credentials)
-        data = self.fetch_endpoint_data(gsc_client)
-        if data:
-            self.write_results(data)
+
+        if self.endpoint == "Search analytics":
+            self.fetch_and_write_search_analytics_data(gsc_client)
+
+        elif self.endpoint == "Sitemaps":
+            sitemap_data = self.get_sitemaps_data(gsc_client)
+            self.write_results(sitemap_data)
+
         else:
-            logging.warning("No data found!")
+            raise ValueError("Endpoint selected does not exist")
+
+    def fetch_and_write_search_analytics_data(self, gsc_client: GoogleSearchConsoleClient) -> None:
+        params = self.configuration.parameters
+        search_analytics_dimensions = self.parse_list_from_string(params.get(KEY_SEARCH_ANALYTICS_DIMENSIONS))
+        incremental = params.get(KEY_LOADING_OPTIONS, {}).get(KEY_LOADING_OPTIONS_INCREMENTAL, 0)
+        date_downloaded = date.today()
+        table = self.create_out_table_definition(self.out_table_name,
+                                                 primary_key=search_analytics_dimensions,
+                                                 incremental=incremental,
+                                                 is_sliced=True)
+        self.create_sliced_directory(table.full_path)
+        fieldnames = []
+        for i, search_data_slice in enumerate(self.get_search_analytics_data(gsc_client)):
+            parsed_slice = self.parse_search_analytics_data(search_data_slice, search_analytics_dimensions)
+            slice_path = path.join(table.full_path, str(i))
+            fieldnames = list(parsed_slice[0].keys())
+            fieldnames.append("date_downloaded")
+            fieldnames.append("domain")
+            self.write_results_to_out_table(slice_path, fieldnames, parsed_slice, date_downloaded)
+        table.columns = fieldnames
+        self.write_tabledef_manifest(table)
+
+    @staticmethod
+    def create_sliced_directory(table_path: str) -> None:
+        logging.info("Creating sliced file")
+        if not path.isdir(table_path):
+            mkdir(table_path)
 
     @staticmethod
     def get_gsc_client(client_id_credentials: OauthCredentials) -> GoogleSearchConsoleClient:
@@ -71,33 +104,26 @@ class Component(ComponentBase):
             domain = "".join(["sc-domain:", domain])
         return domain
 
-    def fetch_endpoint_data(self, gsc_client: GoogleSearchConsoleClient) -> List[Dict]:
-        # Change to generator if memory issue
-        if self.endpoint == "Search analytics":
-            return self.get_search_analytics_data(gsc_client)
-        elif self.endpoint == "Sitemaps":
-            return self.get_sitemaps_data(gsc_client)
-        else:
-            raise ValueError("Endpoint selected does not exist")
-
     def write_results(self, data: List[Dict]) -> None:
         fieldnames = list(data[0].keys())
         fieldnames.append("date_downloaded")
         fieldnames.append("domain")
         date_downloaded = date.today()
-        out_table = self.create_out_table_definition(name=self.out_table_name, columns=fieldnames)
-        self.write_results_to_out_table(out_table, data, date_downloaded)
+        out_table = self.create_out_table_definition(name=self.out_table_name,
+                                                     columns=fieldnames)
+        self.write_results_to_out_table(out_table.full_path, fieldnames, data, date_downloaded)
         self.write_tabledef_manifest(out_table)
 
-    def write_results_to_out_table(self, out_table: TableDefinition, data: List[Dict], date_downloaded: date) -> None:
-        with open(out_table.full_path, mode='wt', encoding='utf-8', newline='') as out_file:
-            writer = csv.DictWriter(out_file, out_table.columns)
+    def write_results_to_out_table(self, file_path: str, fieldnames: List[str], data: List[Dict],
+                                   date_downloaded: date) -> None:
+        with open(file_path, mode='wt', encoding='utf-8', newline='') as out_file:
+            writer = csv.DictWriter(out_file, fieldnames)
             for result in data:
                 result["date_downloaded"] = date_downloaded
                 result["domain"] = self.domain
                 writer.writerow(result)
 
-    def get_search_analytics_data(self, gsc_client: GoogleSearchConsoleClient) -> List[Dict]:
+    def get_search_analytics_data(self, gsc_client: GoogleSearchConsoleClient) -> Generator:
         params = self.configuration.parameters
         search_analytics_dimensions = self.parse_list_from_string(params.get(KEY_SEARCH_ANALYTICS_DIMENSIONS))
         if not search_analytics_dimensions:
@@ -110,27 +136,25 @@ class Component(ComponentBase):
         logging.info(
             f"Fetching data for search analytics for {search_analytics_dimensions} dimensions for domain {self.domain},"
             f"for dates from {date_from} to {date_to}")
+
         logging.info(f"Filters set as {self.filter_groups}")
 
-        data = []
-        for filter_group in self.filter_groups:
-            data.extend(self._get_search_analytics_data(gsc_client, date_from, date_to, search_analytics_dimensions,
-                                                        filter_group=filter_group))
         if not self.filter_groups:
-            data.extend(self._get_search_analytics_data(gsc_client, date_from, date_to, search_analytics_dimensions))
+            return self._get_search_analytics_data(gsc_client, date_from, date_to, search_analytics_dimensions)
 
-        logging.info("Parsing results")
-        if data:
-            data = self.parse_search_analytics_data(data, search_analytics_dimensions)
-            data = self.filter_duplicates_from_data(data)
-        return data
+        for filter_group in self.filter_groups:
+            return self._get_search_analytics_data(gsc_client, date_from, date_to, search_analytics_dimensions,
+                                                   filter_group=filter_group)
 
     def _get_search_analytics_data(self, gsc_client: GoogleSearchConsoleClient, date_from: date, date_to: date,
-                                   search_analytics_dimensions: List[str], filter_group: List[dict] = []) -> List[Dict]:
+                                   search_analytics_dimensions: List[str], filter_group=None) -> Generator:
+        if filter_group is None:
+            filter_group = []
         try:
-            data = gsc_client.get_search_analytics_data(date_from, date_to, self.domain, search_analytics_dimensions,
-                                                        filter_group)
-            return data
+            paged_data = gsc_client.get_search_analytics_data(date_from, date_to, self.domain,
+                                                              search_analytics_dimensions,
+                                                              filter_group)
+            return paged_data
         except ClientError as client_error:
             raise UserException(client_error.args[0].error_details[0]["message"]) from client_error
 
@@ -151,7 +175,6 @@ class Component(ComponentBase):
 
     def parse_search_analytics_data(self, data: List[Dict], dimensions: List[str]) -> List[Dict]:
         parsed_data = []
-
         for row in data:
             parsed_data.append(self._parse_search_analytics_row(row, dimensions))
         return parsed_data

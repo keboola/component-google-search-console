@@ -5,7 +5,7 @@ from apiclient import discovery
 from googleapiclient.errors import HttpError
 from google.auth.exceptions import RefreshError
 from .exception import ClientError, RetryableException
-from typing import Dict, List
+from typing import Dict, List, Generator
 from datetime import date
 
 API_ROW_LIMIT = 25000
@@ -41,7 +41,7 @@ class GoogleSearchConsoleClient:
         return verified_sites_urls
 
     def get_search_analytics_data(self, start_date: date, end_date: date, url: str, dimensions: List[str],
-                                  filter_groups: List[Dict] = None) -> List[Dict]:
+                                  filter_groups: List[Dict] = None) -> Generator:
         request: Dict = {
             'startDate': str(start_date),
             'endDate': str(end_date),
@@ -50,12 +50,11 @@ class GoogleSearchConsoleClient:
         }
         for filters in filter_groups:
             request["dimensionFilterGroups"].append({"groupType": "and", "filters": filters})
-        return self.get_all_pages(request, url)
+        return self.get_result_pages(request, url)
 
-    def get_all_pages(self, request: Dict, url: str) -> List[Dict]:
+    def get_result_pages(self, request: Dict, url: str) -> Generator:
         row_limit = API_ROW_LIMIT
         start_row = 0
-        response_data = []
         last_page = False
         while not last_page:
             request["rowLimit"] = row_limit
@@ -63,13 +62,12 @@ class GoogleSearchConsoleClient:
             response = self.execute_search_analytics_request(self.service, url, request)
             if "rows" in response:
                 data = response["rows"]
-                response_data.extend(data)
+                yield data
                 if len(data) != row_limit:
                     last_page = True
                 start_row = start_row + row_limit
             else:
                 last_page = True
-        return response_data
 
     def execute_search_analytics_request(self, service, property_uri: str, request: Dict) -> Dict:
         return self._execute_search_analytics_request(service, property_uri, request)
