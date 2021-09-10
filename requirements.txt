@@ -1,5 +1,4 @@
 mock~=4.0.3
-keboola.component==1.1.0
 freezegun~=1.1.0
 dateparser~=1.0.0
 retry~=0.9.2

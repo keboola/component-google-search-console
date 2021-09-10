@@ -7,6 +7,7 @@ from google.auth.exceptions import RefreshError
 from .exception import ClientError, RetryableException
 from typing import Dict, List, Generator
 from datetime import date
+import socket
 
 API_ROW_LIMIT = 25000
 RETRYABLE_ERROR_CODES = ["concurrentLimitExceeded", "dailyLimitExceeded", "dailyLimitExceededUnreg", "limitExceeded",
@@ -70,7 +71,10 @@ class GoogleSearchConsoleClient:
                 last_page = True
 
     def execute_search_analytics_request(self, service, property_uri: str, request: Dict) -> Dict:
-        return self._execute_search_analytics_request(service, property_uri, request)
+        try:
+            return self._execute_search_analytics_request(service, property_uri, request)
+        except socket.timeout:
+            raise ClientError("Connection timed out, please try a smaller query")
 
     @retry(RetryableException, tries=3, delay=60, jitter=600)
     def _execute_search_analytics_request(self, service, property_uri: str, request: Dict) -> Dict:
