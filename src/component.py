@@ -9,6 +9,7 @@ from keboola.component.base import ComponentBase, UserException
 from google_search_console import GoogleSearchConsoleClient, ClientError
 from keboola.component.dao import OauthCredentials
 from typing import Dict, Tuple, Generator
+from googleapiclient.errors import HttpError
 
 KEY_DOMAIN = 'domain'
 KEY_OUT_TABLE_NAME = "out_table_name"
@@ -68,15 +69,18 @@ class Component(ComponentBase):
                                                  is_sliced=True)
         self.create_sliced_directory(table.full_path)
         fieldnames = []
-        for i, search_data_slice in enumerate(self.get_search_analytics_data(gsc_client)):
-            parsed_slice = self.parse_search_analytics_data(search_data_slice, search_analytics_dimensions)
-            slice_path = path.join(table.full_path, str(i))
-            fieldnames = list(parsed_slice[0].keys())
-            fieldnames.append("date_downloaded")
-            fieldnames.append("domain")
-            self.write_results_to_out_table(slice_path, fieldnames, parsed_slice, date_downloaded)
-        table.columns = fieldnames
-        self.write_tabledef_manifest(table)
+        try:
+            for i, search_data_slice in enumerate(self.get_search_analytics_data(gsc_client)):
+                parsed_slice = self.parse_search_analytics_data(search_data_slice, search_analytics_dimensions)
+                slice_path = path.join(table.full_path, str(i))
+                fieldnames = list(parsed_slice[0].keys())
+                fieldnames.append("date_downloaded")
+                fieldnames.append("domain")
+                self.write_results_to_out_table(slice_path, fieldnames, parsed_slice, date_downloaded)
+            table.columns = fieldnames
+            self.write_tabledef_manifest(table)
+        except (ClientError, HttpError) as cl_error:
+            raise UserException(cl_error) from cl_error
 
     @staticmethod
     def create_sliced_directory(table_path: str) -> None:
