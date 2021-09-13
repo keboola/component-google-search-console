@@ -97,7 +97,11 @@ class GoogleSearchConsoleClient:
 
     @staticmethod
     def _process_exception(http_error):
-        if http_error.error_details[0]["reason"] in RETRYABLE_ERROR_CODES:
-            raise RetryableException(http_error.error_details[0]["reason"]) from http_error
-        else:
+        try:
+            print(http_error.error_details)
+            if http_error.error_details[0]["reason"] in RETRYABLE_ERROR_CODES:
+                raise RetryableException(http_error.error_details[0]["reason"]) from http_error
+            else:
+                raise ClientError(http_error)
+        except TypeError:
             raise ClientError(http_error)
