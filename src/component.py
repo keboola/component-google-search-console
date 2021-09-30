@@ -2,7 +2,7 @@ import logging
 import dateparser
 import csv
 from datetime import date
-from os import path, mkdir
+from os import path, mkdir, listdir, rmdir
 from datetime import timedelta
 from typing import List
 from keboola.component.base import ComponentBase, UserException
@@ -78,7 +78,11 @@ class Component(ComponentBase):
                 fieldnames.append("domain")
                 self.write_results_to_out_table(slice_path, fieldnames, parsed_slice, date_downloaded)
             table.columns = fieldnames
-            self.write_tabledef_manifest(table)
+            if len(listdir(table.full_path)) != 0:
+                self.write_tabledef_manifest(table)
+            else:
+                logging.warning("No Data Found")
+                rmdir(table.full_path)
         except (ClientError, HttpError) as cl_error:
             raise UserException(cl_error) from cl_error
 
