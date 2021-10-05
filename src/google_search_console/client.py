@@ -28,9 +28,7 @@ class GoogleSearchConsoleClient:
             credentials.refresh(request)
         except RefreshError:
             raise ClientError("Invalid credentials, please re-authenticate the application")
-        self.service = discovery.build(serviceName='webmasters',
-                                       version='v3',
-                                       credentials=credentials,
+        self.service = discovery.build('searchconsole', 'v1', credentials=credentials,
                                        cache_discovery=False)
 
     def get_verified_sites(self):
