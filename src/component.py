@@ -39,6 +39,7 @@ warnings.filterwarnings(
     message="The localize method is no longer necessary, as this time zone supports the fold attribute",
 )
 
+
 class Component(ComponentBase):
     def __init__(self) -> None:
         super().__init__(required_parameters=REQUIRED_PARAMETERS,
