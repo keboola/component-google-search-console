@@ -14,7 +14,8 @@ Authorization is done via instant authorization, link Google account
 
  - Domain (domain) - [REQ] Domain name you wish to extract data from eg. keboola.com
  - Endpoint (endpoint) - [REQ] Search analytics or Sitemaps
- - Dimensions (search_analytics_dimensions) - [REQ For Search Analytics] List of search analytics dimensions eg. page, query, date 
+ - Dimensions (search_analytics_dimensions) - [REQ For Search Analytics] List of search analytics dimensions eg. page, query, date
+ - Type (search_type) - [OPT] filter the results for the following types : news, video, image, web, discover, or googleNews
  - Date range type (date_range) - [REQ For Search Analytics] Type of date range
     - Last week (sun-sat) used for WEEK dimension
     - Last month (from first day of the previous month to last day of the previous month)

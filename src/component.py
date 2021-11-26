@@ -19,6 +19,7 @@ KEY_SEARCH_ANALYTICS_DIMENSIONS = "search_analytics_dimensions"
 KEY_DATE_FROM = "date_from"
 KEY_DATE_TO = "date_to"
 KEY_DATE_RANGE = "date_range"
+KEY_SEARCH_TYPE = "search_type"
 KEY_CLIENT_ID = "appKey"
 KEY_CLIENT_SECRET = "appSecret"
 KEY_REFRESH_TOKEN = "refresh_token"
@@ -29,6 +30,8 @@ KEY_LOADING_OPTIONS_INCREMENTAL = "incremental"
 
 SITEMAPS_HEADERS = ["path", "lastSubmitted", "isPending", "isSitemapsIndex", "type", "lastDownloaded", "warnings",
                     "errors"]
+
+SEARCH_TYPES = ["news", "video", "image", "web", "discover", "googleNews"]
 
 REQUIRED_PARAMETERS = [KEY_DOMAIN, KEY_OUT_TABLE_NAME, KEY_ENDPOINT]
 REQUIRED_IMAGE_PARS = []
@@ -68,7 +71,7 @@ class Component(ComponentBase):
 
     def fetch_and_write_search_analytics_data(self, gsc_client: GoogleSearchConsoleClient) -> None:
         params = self.configuration.parameters
-        search_analytics_dimensions = self.parse_list_from_string(params.get(KEY_SEARCH_ANALYTICS_DIMENSIONS))
+        search_analytics_dimensions = self.parse_list_from_string(params.get(KEY_SEARCH_ANALYTICS_DIMENSIONS, ""))
         incremental = params.get(KEY_LOADING_OPTIONS, {}).get(KEY_LOADING_OPTIONS_INCREMENTAL, 0)
         date_downloaded = date.today()
         table = self.create_out_table_definition(self.out_table_name,
@@ -141,7 +144,10 @@ class Component(ComponentBase):
 
     def get_search_analytics_data(self, gsc_client: GoogleSearchConsoleClient) -> Generator:
         params = self.configuration.parameters
-        search_analytics_dimensions = self.parse_list_from_string(params.get(KEY_SEARCH_ANALYTICS_DIMENSIONS))
+        search_analytics_dimensions = self.parse_list_from_string(params.get(KEY_SEARCH_ANALYTICS_DIMENSIONS, ""))
+        search_type = params.get(KEY_SEARCH_TYPE)
+        if search_type and search_type not in SEARCH_TYPES:
+            raise UserException(f"Type must be one of the following {SEARCH_TYPES}, you entered '{search_type}'.")
         if not search_analytics_dimensions:
             raise UserException("Missing Search Analytics dimensions, please fill them in")
 
@@ -156,19 +162,21 @@ class Component(ComponentBase):
         logging.info(f"Filters set as {self.filter_groups}")
 
         if not self.filter_groups:
-            return self._get_search_analytics_data(gsc_client, date_from, date_to, search_analytics_dimensions)
+            return self._get_search_analytics_data(gsc_client, date_from, date_to, search_analytics_dimensions,
+                                                   search_type)
 
         for filter_group in self.filter_groups:
             return self._get_search_analytics_data(gsc_client, date_from, date_to, search_analytics_dimensions,
-                                                   filter_group=filter_group)
+                                                   search_type, filter_group=filter_group)
 
     def _get_search_analytics_data(self, gsc_client: GoogleSearchConsoleClient, date_from: date, date_to: date,
-                                   search_analytics_dimensions: List[str], filter_group=None) -> Generator:
+                                   search_analytics_dimensions: List[str], search_type: str,
+                                   filter_group=None) -> Generator:
         if filter_group is None:
             filter_group = []
         try:
             paged_data = gsc_client.get_search_analytics_data(date_from, date_to, self.domain,
-                                                              search_analytics_dimensions,
+                                                              search_analytics_dimensions, search_type,
                                                               filter_group)
             return paged_data
         except ClientError as client_error:
@@ -187,7 +195,10 @@ class Component(ComponentBase):
 
     @staticmethod
     def parse_list_from_string(string_list: str) -> List[str]:
-        return [word.strip() for word in string_list.split(",") if len(word) > 1]
+        if "," in string_list:
+            return [word.strip() for word in string_list.split(",") if len(word) > 1]
+        else:
+            return [string_list]
 
     def parse_search_analytics_data(self, data: List[Dict], dimensions: List[str]) -> List[Dict]:
         parsed_data = []
