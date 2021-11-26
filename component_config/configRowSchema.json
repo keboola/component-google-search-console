@@ -34,6 +34,17 @@
       "description": "Comma separated list of search analytics dimensions eg. page, query, date",
       "propertyOrder": 3
     },
+    "search_type": {
+      "title": "Type",
+      "type": "string",
+      "options": {
+        "dependencies": {
+          "endpoint": "Search analytics"
+        }
+      },
+      "description": " Filter results to the following types: news, video, image, web, discover, or googleNews",
+      "propertyOrder": 4
+    },
     "date_range": {
       "title": "Date range type",
       "type": "string",
@@ -47,7 +58,7 @@
           "endpoint": "Search analytics"
         }
       },
-      "propertyOrder": 4
+      "propertyOrder": 5
     },
     "date_from": {
       "title": "Date from",
@@ -59,7 +70,7 @@
         }
       },
       "description": "Start date of the report eg. 3 days ago",
-      "propertyOrder": 5
+      "propertyOrder": 6
     },
     "date_to": {
       "title": "Date to",
@@ -71,13 +82,13 @@
         }
       },
       "description": "End date of the report eg. 1 day ago",
-      "propertyOrder": 6
+      "propertyOrder": 7
     },
     "out_table_name": {
       "title": "Output name",
       "type": "string",
       "description": "Name of output table in Keboola storage",
-      "propertyOrder": 7
+      "propertyOrder": 8
     },
     "filter_groups": {
       "type": "array",

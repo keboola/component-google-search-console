@@ -40,13 +40,15 @@ class GoogleSearchConsoleClient:
         return verified_sites_urls
 
     def get_search_analytics_data(self, start_date: date, end_date: date, url: str, dimensions: List[str],
-                                  filter_groups: List[Dict] = None) -> Generator:
+                                  search_type: str, filter_groups: List[Dict] = None) -> Generator:
         request: Dict = {
             'startDate': str(start_date),
             'endDate': str(end_date),
             'dimensions': dimensions,
             "dimensionFilterGroups": []
         }
+        if search_type:
+            request["type"] = search_type
         for filters in filter_groups:
             request["dimensionFilterGroups"].append({"groupType": "and", "filters": filters})
         return self.get_result_pages(request, url)
@@ -103,6 +105,9 @@ class GoogleSearchConsoleClient:
             if http_error.error_details[0]["reason"] in RETRYABLE_ERROR_CODES:
                 raise RetryableException(http_error.error_details[0]["reason"]) from http_error
             else:
+                if http_error.reason == 'Request contains an invalid argument.':
+                    raise ClientError("Request contains an invalid argument. Make sure all your dimensions and "
+                                      "filters are valid along with your search Type filter.")
                 raise ClientError(http_error)
         except TypeError:
             raise ClientError(http_error)
