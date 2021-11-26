@@ -1,5 +1,6 @@
 import logging
 import dateparser
+import warnings
 import csv
 from datetime import date
 from os import path, mkdir, listdir, rmdir
@@ -32,6 +33,11 @@ SITEMAPS_HEADERS = ["path", "lastSubmitted", "isPending", "isSitemapsIndex", "ty
 REQUIRED_PARAMETERS = [KEY_DOMAIN, KEY_OUT_TABLE_NAME, KEY_ENDPOINT]
 REQUIRED_IMAGE_PARS = []
 
+# Ignore dateparser warnings regarding pytz
+warnings.filterwarnings(
+    "ignore",
+    message="The localize method is no longer necessary, as this time zone supports the fold attribute",
+)
 
 class Component(ComponentBase):
     def __init__(self) -> None:
@@ -40,6 +46,7 @@ class Component(ComponentBase):
         params = self.configuration.parameters
         self.out_table_name = params.get(KEY_OUT_TABLE_NAME)
         self.validate_table_name(self.out_table_name)
+        self.out_table_name = "".join([self.out_table_name, ".csv"])
         self.endpoint = params.get(KEY_ENDPOINT)
         self.domain = self.get_domain_string(params.get(KEY_DOMAIN))
         self.filter_groups = params.get(KEY_FILTER_GROUPS, [[]])

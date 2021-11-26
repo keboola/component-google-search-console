@@ -92,6 +92,9 @@ class GoogleSearchConsoleClient:
             return sitemaps
         except HttpError as http_error:
             self._process_exception(http_error)
+        except KeyError:
+            raise ClientError(f"Could not fetch sitemaps from the API, the returned data did not contain the sitemaps. "
+                              f"Data returned :({self.service.sitemaps().list(siteUrl=url).execute()}) ")
 
     @staticmethod
     def _process_exception(http_error):
