@@ -1,1 +1,1 @@
-from .client import GoogleSearchConsoleClient, ClientError  # noqa
+from .client import GoogleSearchConsoleClient, ClientError, ClientAuthError  # noqa

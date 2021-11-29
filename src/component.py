@@ -7,7 +7,7 @@ from os import path, mkdir, listdir, rmdir
 from datetime import timedelta
 from typing import List
 from keboola.component.base import ComponentBase, UserException
-from google_search_console import GoogleSearchConsoleClient, ClientError
+from google_search_console import GoogleSearchConsoleClient, ClientError, ClientAuthError
 from keboola.component.dao import OauthCredentials
 from typing import Dict, Tuple, Generator
 from googleapiclient.errors import HttpError
@@ -52,12 +52,14 @@ class Component(ComponentBase):
         self.validate_table_name(self.out_table_name)
         self.out_table_name = "".join([self.out_table_name, ".csv"])
         self.endpoint = params.get(KEY_ENDPOINT)
-        self.domain = self.get_domain_string(params.get(KEY_DOMAIN))
+        self.domain = params.get(KEY_DOMAIN)
         self.filter_groups = params.get(KEY_FILTER_GROUPS, [[]])
 
     def run(self) -> None:
         client_id_credentials = self.configuration.oauth_credentials
         gsc_client = self.get_gsc_client(client_id_credentials)
+
+        logging.getLogger("googleapiclient.http").disabled = True
 
         if self.endpoint == "Search analytics":
             self.fetch_and_write_search_analytics_data(gsc_client)
@@ -116,12 +118,6 @@ class Component(ComponentBase):
             return GoogleSearchConsoleClient(client_id, client_secret, refresh_token)
         except ClientError as client_error:
             raise UserException(client_error) from client_error
-
-    @staticmethod
-    def get_domain_string(domain: str) -> str:
-        if "sc-domain:" not in domain:
-            domain = "".join(["sc-domain:", domain])
-        return domain
 
     def write_results(self, data: List[Dict]) -> None:
         fieldnames = list(data[0].keys())
@@ -229,6 +225,8 @@ class Component(ComponentBase):
             return gsc_client.get_sitemaps_data(self.domain)
         except ClientError as client_error:
             raise UserException(client_error.args[0].error_details[0]["message"]) from client_error
+        except ClientAuthError as client_auth_error:
+            raise UserException(client_auth_error)
 
     def parse_sitemaps_data(self, data: List[Dict]) -> List[Dict]:
         parsed_data = []

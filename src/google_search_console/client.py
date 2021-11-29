@@ -4,7 +4,7 @@ from google.auth.transport import requests
 from apiclient import discovery
 from googleapiclient.errors import HttpError
 from google.auth.exceptions import RefreshError
-from .exception import ClientError, RetryableException
+from .exception import ClientError, RetryableException, ClientAuthError
 from typing import Dict, List, Generator
 from datetime import date
 import socket
@@ -72,7 +72,31 @@ class GoogleSearchConsoleClient:
 
     def execute_search_analytics_request(self, service, property_uri: str, request: Dict) -> Dict:
         try:
-            return self._execute_search_analytics_request(service, property_uri, request)
+            search_analytics_data = self._execute_search_analytics_request(service, property_uri, request)
+            if not search_analytics_data:
+                search_analytics_data = self._execute_search_analytics_request(service,
+                                                                               "".join(["sc-domain:", property_uri]),
+                                                                               request)
+            if not search_analytics_data:
+                search_analytics_data = self._execute_search_analytics_request(service,
+                                                                               "".join(["https://www.", property_uri]),
+                                                                               request)
+            if not search_analytics_data:
+                search_analytics_data = self._execute_search_analytics_request(service,
+                                                                               "".join(["http://www.", property_uri]),
+                                                                               request)
+            if not search_analytics_data:
+                search_analytics_data = self._execute_search_analytics_request(service,
+                                                                               "".join(["https://", property_uri]),
+                                                                               request)
+            if not search_analytics_data:
+                search_analytics_data = self._execute_search_analytics_request(service,
+                                                                               "".join(["http://", property_uri]),
+                                                                               request)
+            if not search_analytics_data:
+                raise ClientAuthError(f"{property_uri} is not a valid Search Console site URL. Make sure you "
+                                      f"have sufficient rights if the url is valid")
+            return search_analytics_data
         except socket.timeout:
             raise ClientError("Connection timed out, please try a smaller query")
 
@@ -81,10 +105,26 @@ class GoogleSearchConsoleClient:
         try:
             return service.searchanalytics().query(siteUrl=property_uri, body=request).execute()
         except HttpError as http_error:
-            self._process_exception(http_error)
+            if http_error.status_code == 403:
+                pass
+            else:
+                self._process_exception(http_error)
 
     def get_sitemaps_data(self, url: str) -> List[Dict]:
         sitemaps = self._get_sitemaps_data(url)
+        if not sitemaps:
+            sitemaps = self._get_sitemaps_data("".join(["sc-domain:", url]))
+        if not sitemaps:
+            sitemaps = self._get_sitemaps_data("".join(["https://www.", url]))
+        if not sitemaps:
+            sitemaps = self._get_sitemaps_data("".join(["http://www.", url]))
+        if not sitemaps:
+            sitemaps = self._get_sitemaps_data("".join(["https://", url]))
+        if not sitemaps:
+            sitemaps = self._get_sitemaps_data("".join(["http://", url]))
+        if not sitemaps:
+            raise ClientAuthError(f"{url} is not a valid Search Console site URL. Make sure you have sufficient "
+                                  f"rights if the url is valid")
         return sitemaps
 
     @retry(RetryableException, tries=3, delay=60, jitter=600)
@@ -93,7 +133,10 @@ class GoogleSearchConsoleClient:
             sitemaps = self.service.sitemaps().list(siteUrl=url).execute()["sitemap"]
             return sitemaps
         except HttpError as http_error:
-            self._process_exception(http_error)
+            if http_error.status_code == 403:
+                pass
+            else:
+                self._process_exception(http_error)
         except KeyError:
             raise ClientError(f"Could not fetch sitemaps from the API, the returned data did not contain the sitemaps. "
                               f"Data returned :({self.service.sitemaps().list(siteUrl=url).execute()}) ")
