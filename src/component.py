@@ -96,7 +96,7 @@ class Component(ComponentBase):
             else:
                 logging.warning("No Data Found")
                 rmdir(table.full_path)
-        except (ClientError, HttpError) as cl_error:
+        except (ClientError, HttpError, ClientAuthError) as cl_error:
             raise UserException(cl_error) from cl_error
 
     @staticmethod
