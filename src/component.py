@@ -11,7 +11,6 @@ from google_search_console import GoogleSearchConsoleClient, ClientError, Client
 from keboola.component.dao import OauthCredentials
 from typing import Dict, Tuple, Generator
 from googleapiclient.errors import HttpError
-from google.oauth2.service_account import Credentials as ServiceAccountCredentials
 import json
 
 
