@@ -30,7 +30,7 @@ KEY_FILTER_GROUPS = "filter_groups"
 KEY_AUTH_DATA = "data"
 KEY_LOADING_OPTIONS = "loading_options"
 KEY_LOADING_OPTIONS_INCREMENTAL = "incremental"
-KEY_SERVICE_ACCOUNT = '#service_account_info'
+KEY_SERVICE_ACCOUNT = "#service_account_info"
 
 SITEMAPS_HEADERS = ["path", "lastSubmitted", "isPending", "isSitemapsIndex", "type", "lastDownloaded", "warnings",
                     "errors"]
@@ -121,10 +121,9 @@ class Component(ComponentBase):
         if service_account_info:
             try:
                 service_account_dict = json.loads(service_account_info)
-                creds = ServiceAccountCredentials.from_service_account_info(service_account_dict)
-                creds = creds.with_scopes(['https://www.googleapis.com/auth/webmasters.readonly'])
+
                 return GoogleSearchConsoleClient(client_id="", client_secret="", refresh_token="",
-                                                 service_account_info=creds)
+                                                 service_account_info=service_account_dict)
             except ClientError as client_error:
                 raise UserException(client_error) from client_error
         elif client_id_credentials:
