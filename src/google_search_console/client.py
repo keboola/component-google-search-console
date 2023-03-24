@@ -21,7 +21,6 @@ class GoogleSearchConsoleClient:
     def __init__(self, client_id: str, client_secret: str, refresh_token: str,
                  service_account_info: dict = None, token_uri: str = "https://oauth2.googleapis.com/token") -> None:
         if service_account_info:
-            print(service_account_info)
             credentials = ServiceAccountCredentials.from_service_account_info(service_account_info)
             credentials = credentials.with_scopes(['https://www.googleapis.com/auth/webmasters.readonly'])
         else:
