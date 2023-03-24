@@ -1,4 +1,5 @@
 from google.oauth2.credentials import Credentials
+from google.oauth2.service_account import Credentials as ServiceAccountCredentials
 from retry import retry
 from google.auth.transport import requests
 from apiclient import discovery
@@ -18,16 +19,19 @@ RETRYABLE_ERROR_CODES = ["concurrentLimitExceeded", "dailyLimitExceeded", "daily
 
 class GoogleSearchConsoleClient:
     def __init__(self, client_id: str, client_secret: str, refresh_token: str,
-                 token_uri: str = "https://oauth2.googleapis.com/token") -> None:
-        credentials = Credentials(None, client_id=client_id,
-                                  client_secret=client_secret,
-                                  refresh_token=refresh_token,
-                                  token_uri=token_uri)
-        request = requests.Request()
-        try:
-            credentials.refresh(request)
-        except RefreshError:
-            raise ClientError("Invalid credentials, please re-authenticate the application")
+                 service_account_info: dict = None, token_uri: str = "https://oauth2.googleapis.com/token") -> None:
+        if service_account_info:
+            credentials = ServiceAccountCredentials.from_service_account_info(service_account_info)
+        else:
+            credentials = Credentials(None, client_id=client_id,
+                                      client_secret=client_secret,
+                                      refresh_token=refresh_token,
+                                      token_uri=token_uri)
+            request = requests.Request()
+            try:
+                credentials.refresh(request)
+            except RefreshError:
+                raise ClientError("Invalid credentials, please re-authenticate the application")
         self.service = discovery.build('searchconsole', 'v1', credentials=credentials,
                                        cache_discovery=False)
 
@@ -40,7 +44,7 @@ class GoogleSearchConsoleClient:
         return verified_sites_urls
 
     def get_search_analytics_data(self, start_date: date, end_date: date, url: str, dimensions: List[str],
-                                  search_type: str, filter_groups: List[Dict] = None) -> Generator:
+                                  search_type: str = None, filter_groups: List[Dict] = None) -> Generator:
         request: Dict = {
             'startDate': str(start_date),
             'endDate': str(end_date),
