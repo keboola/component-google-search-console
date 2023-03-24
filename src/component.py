@@ -30,7 +30,7 @@ KEY_FILTER_GROUPS = "filter_groups"
 KEY_AUTH_DATA = "data"
 KEY_LOADING_OPTIONS = "loading_options"
 KEY_LOADING_OPTIONS_INCREMENTAL = "incremental"
-KEY_SERVICE_ACCOUNT = 'service_account_info'
+KEY_SERVICE_ACCOUNT = '#service_account_info'
 
 SITEMAPS_HEADERS = ["path", "lastSubmitted", "isPending", "isSitemapsIndex", "type", "lastDownloaded", "warnings",
                     "errors"]
