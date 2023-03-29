@@ -120,7 +120,10 @@ class Component(ComponentBase):
         if service_account_info:
             try:
                 service_account_dict = json.loads(service_account_info)
+            except json.decoder.JSONDecodeError:
+                raise UserException("Cannot parse service account json.")
 
+            try:
                 return GoogleSearchConsoleClient(client_id="", client_secret="", refresh_token="",
                                                  service_account_info=service_account_dict)
             except ClientError as client_error:
