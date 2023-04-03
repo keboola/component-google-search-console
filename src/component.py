@@ -11,6 +11,8 @@ from google_search_console import GoogleSearchConsoleClient, ClientError, Client
 from keboola.component.dao import OauthCredentials
 from typing import Dict, Tuple, Generator
 from googleapiclient.errors import HttpError
+import json
+
 
 KEY_DOMAIN = 'domain'
 KEY_OUT_TABLE_NAME = "out_table_name"
@@ -27,6 +29,7 @@ KEY_FILTER_GROUPS = "filter_groups"
 KEY_AUTH_DATA = "data"
 KEY_LOADING_OPTIONS = "loading_options"
 KEY_LOADING_OPTIONS_INCREMENTAL = "incremental"
+KEY_SERVICE_ACCOUNT = "#service_account_info"
 
 SITEMAPS_HEADERS = ["path", "lastSubmitted", "isPending", "isSitemapsIndex", "type", "lastDownloaded", "warnings",
                     "errors"]
@@ -55,9 +58,15 @@ class Component(ComponentBase):
         self.domain = params.get(KEY_DOMAIN)
         self.filter_groups = params.get(KEY_FILTER_GROUPS, [[]])
 
+        self.service_account_info = params.get(KEY_SERVICE_ACCOUNT, None)
+
     def run(self) -> None:
         client_id_credentials = self.configuration.oauth_credentials
-        gsc_client = self.get_gsc_client(client_id_credentials)
+
+        if self.service_account_info:
+            gsc_client = self.get_gsc_client(service_account_info=self.service_account_info)
+        else:
+            gsc_client = self.get_gsc_client(client_id_credentials=client_id_credentials)
 
         logging.getLogger("googleapiclient.http").disabled = True
 
@@ -106,18 +115,30 @@ class Component(ComponentBase):
             mkdir(table_path)
 
     @staticmethod
-    def get_gsc_client(client_id_credentials: OauthCredentials) -> GoogleSearchConsoleClient:
-        if client_id_credentials:
+    def get_gsc_client(client_id_credentials: OauthCredentials = None, service_account_info: str = "")\
+            -> GoogleSearchConsoleClient:
+        if service_account_info:
+            try:
+                service_account_dict = json.loads(service_account_info)
+            except json.decoder.JSONDecodeError:
+                raise UserException("Cannot parse service account json.")
+
+            try:
+                return GoogleSearchConsoleClient.from_service_account(service_account_dict)
+            except ClientError as client_error:
+                raise UserException(client_error) from client_error
+        elif client_id_credentials:
             client_id = client_id_credentials[KEY_CLIENT_ID]
             client_secret = client_id_credentials[KEY_CLIENT_SECRET]
             refresh_token = client_id_credentials[KEY_AUTH_DATA][KEY_REFRESH_TOKEN]
+
+            try:
+                return GoogleSearchConsoleClient.from_auth_code(client_id, client_secret, refresh_token)
+            except ClientError as client_error:
+                raise UserException(client_error) from client_error
         else:
             raise UserException(
                 "Component is not authorized, please authorize the app in the authorization configuration ")
-        try:
-            return GoogleSearchConsoleClient(client_id, client_secret, refresh_token)
-        except ClientError as client_error:
-            raise UserException(client_error) from client_error
 
     def write_results(self, data: List[Dict]) -> None:
         fieldnames = list(data[0].keys())

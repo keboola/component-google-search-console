@@ -1,8 +1,9 @@
 from google.oauth2.credentials import Credentials
+from google.oauth2.service_account import Credentials as ServiceAccountCredentials
 from retry import retry
 from google.auth.transport import requests
-from apiclient import discovery
 from googleapiclient.errors import HttpError
+from googleapiclient import discovery
 from google.auth.exceptions import RefreshError
 from .exception import ClientError, RetryableException, ClientAuthError
 from typing import Dict, List, Generator
@@ -17,8 +18,11 @@ RETRYABLE_ERROR_CODES = ["concurrentLimitExceeded", "dailyLimitExceeded", "daily
 
 
 class GoogleSearchConsoleClient:
-    def __init__(self, client_id: str, client_secret: str, refresh_token: str,
-                 token_uri: str = "https://oauth2.googleapis.com/token") -> None:
+    def __init__(self, credentials: Credentials, **kwargs) -> None:
+        self.service = discovery.build('searchconsole', 'v1', credentials=credentials, cache_discovery=False)
+
+    @classmethod
+    def from_auth_code(cls, client_id, client_secret, refresh_token, token_uri="https://oauth2.googleapis.com/token"):
         credentials = Credentials(None, client_id=client_id,
                                   client_secret=client_secret,
                                   refresh_token=refresh_token,
@@ -28,8 +32,15 @@ class GoogleSearchConsoleClient:
             credentials.refresh(request)
         except RefreshError:
             raise ClientError("Invalid credentials, please re-authenticate the application")
-        self.service = discovery.build('searchconsole', 'v1', credentials=credentials,
-                                       cache_discovery=False)
+
+        return cls(credentials)
+
+    @classmethod
+    def from_service_account(cls, service_account_info):
+        credentials = ServiceAccountCredentials.from_service_account_info(service_account_info)
+        credentials = credentials.with_scopes(['https://www.googleapis.com/auth/webmasters.readonly'])
+
+        return cls(credentials)
 
     def get_verified_sites(self):
         site_list = self.service.sites().list().execute()
@@ -40,7 +51,7 @@ class GoogleSearchConsoleClient:
         return verified_sites_urls
 
     def get_search_analytics_data(self, start_date: date, end_date: date, url: str, dimensions: List[str],
-                                  search_type: str, filter_groups: List[Dict] = None) -> Generator:
+                                  search_type: str = None, filter_groups: List[Dict] = None) -> Generator:
         request: Dict = {
             'startDate': str(start_date),
             'endDate': str(end_date),
