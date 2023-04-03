@@ -124,8 +124,7 @@ class Component(ComponentBase):
                 raise UserException("Cannot parse service account json.")
 
             try:
-                return GoogleSearchConsoleClient(client_id="", client_secret="", refresh_token="",
-                                                 service_account_info=service_account_dict)
+                return GoogleSearchConsoleClient.from_service_account(service_account_dict)
             except ClientError as client_error:
                 raise UserException(client_error) from client_error
         elif client_id_credentials:
@@ -134,7 +133,7 @@ class Component(ComponentBase):
             refresh_token = client_id_credentials[KEY_AUTH_DATA][KEY_REFRESH_TOKEN]
 
             try:
-                return GoogleSearchConsoleClient(client_id, client_secret, refresh_token)
+                return GoogleSearchConsoleClient.from_auth_code(client_id, client_secret, refresh_token)
             except ClientError as client_error:
                 raise UserException(client_error) from client_error
         else:
