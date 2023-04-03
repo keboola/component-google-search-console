@@ -166,6 +166,23 @@
           "propertyOrder": 200
         }
       }
+    },
+    "use_service_account": {
+      "title": "Use Service Account",
+      "type": "checkbox",
+      "default": false,
+      "description": "Enables the use of service account."
+    },
+    "#service_account_info": {
+      "title": "Service Account Info",
+      "type": "string",
+      "format": "textarea",
+      "description": "To use your service account, copy and paste the entire JSON code into the text area. Not sure how to create a service account? Check out the <a href='https://developers.google.com/identity/protocols/oauth2/service-account#creatinganaccount'>Google Identity Documentation</a> for step-by-step instructions.",
+            "options": {
+        "dependencies": {
+          "use_service_account": true
+        }
+      }
     }
   }
 }
