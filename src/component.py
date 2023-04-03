@@ -30,6 +30,7 @@ KEY_AUTH_DATA = "data"
 KEY_LOADING_OPTIONS = "loading_options"
 KEY_LOADING_OPTIONS_INCREMENTAL = "incremental"
 KEY_SERVICE_ACCOUNT = "#service_account_info"
+GROUP_SERVICE_ACCOUNT = "use_service_account"
 
 SITEMAPS_HEADERS = ["path", "lastSubmitted", "isPending", "isSitemapsIndex", "type", "lastDownloaded", "warnings",
                     "errors"]
@@ -58,7 +59,8 @@ class Component(ComponentBase):
         self.domain = params.get(KEY_DOMAIN)
         self.filter_groups = params.get(KEY_FILTER_GROUPS, [[]])
 
-        self.service_account_info = params.get(KEY_SERVICE_ACCOUNT, None)
+        if params.get(GROUP_SERVICE_ACCOUNT, None):
+            self.service_account_info = params.get(KEY_SERVICE_ACCOUNT, None)
 
     def run(self) -> None:
         client_id_credentials = self.configuration.oauth_credentials
