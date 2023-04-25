@@ -169,7 +169,8 @@
     },
     "use_service_account": {
       "title": "Use Service Account",
-      "type": "checkbox",
+      "type": "boolean",
+      "format": "checkbox",
       "default": false,
       "description": "Enables the use of service account."
     },
