@@ -39,8 +39,8 @@ class GoogleSearchConsoleClient:
 
     @classmethod
     def from_service_account(cls, service_account_info):
-        scope = ['https://www.googleapis.com/auth/webmasters.readonly']
-        credentials = ServiceAccountCredentials.from_service_account_info(service_account_info, scopes=scope)
+        credentials = ServiceAccountCredentials.from_service_account_info(service_account_info)
+        credentials = credentials.with_scopes(['https://www.googleapis.com/auth/webmasters.readonly'])
 
         return cls(credentials)
 
@@ -116,8 +116,7 @@ class GoogleSearchConsoleClient:
     @retry(RetryableException, tries=3, delay=60, jitter=600)
     def _execute_search_analytics_request(self, service, property_uri: str, request: Dict) -> Dict:
         try:
-            r = service.searchanalytics().query(siteUrl=property_uri, body=request).execute()
-            return r
+            return service.searchanalytics().query(siteUrl=property_uri, body=request).execute()
         except HttpError as http_error:
             logging.error(f"Encountered error when querying search analytics: {http_error}")
             if http_error.status_code == 403:
@@ -138,8 +137,8 @@ class GoogleSearchConsoleClient:
         if not sitemaps:
             sitemaps = self._get_sitemaps_data("".join(["http://", url]))
         if not sitemaps:
-            raise ClientAuthError(f"{url} is not a valid Search Console site URL. Check error log and make sure you "
-                                  f"have sufficient rights and if the url is valid.")
+            raise ClientAuthError(f"{url} is not a valid Search Console site URL. Check the error log and make sure "
+                                  f"you have sufficient rights and if the url is valid.")
         return sitemaps
 
     @retry(RetryableException, tries=3, delay=60, jitter=600)
