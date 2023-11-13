@@ -107,7 +107,7 @@ class GoogleSearchConsoleClient:
                                                                                "".join(["http://", property_uri]),
                                                                                request)
             if not search_analytics_data:
-                raise ClientAuthError(f"Found no search analytics data. Make sure you have sufficient rights and the "
+                raise ClientAuthError("Found no search analytics data. Make sure you have sufficient rights and the "
                                       f"url is valid.")
             return search_analytics_data
         except socket.timeout:
