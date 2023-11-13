@@ -1,3 +1,5 @@
+import logging
+
 from google.oauth2.credentials import Credentials
 from google.oauth2.service_account import Credentials as ServiceAccountCredentials
 from retry import retry
@@ -37,8 +39,8 @@ class GoogleSearchConsoleClient:
 
     @classmethod
     def from_service_account(cls, service_account_info):
-        credentials = ServiceAccountCredentials.from_service_account_info(service_account_info)
-        credentials = credentials.with_scopes(['https://www.googleapis.com/auth/webmasters.readonly'])
+        scope = ['https://www.googleapis.com/auth/webmasters.readonly']
+        credentials = ServiceAccountCredentials.from_service_account_info(service_account_info, scopes=scope)
 
         return cls(credentials)
 
@@ -105,8 +107,8 @@ class GoogleSearchConsoleClient:
                                                                                "".join(["http://", property_uri]),
                                                                                request)
             if not search_analytics_data:
-                raise ClientAuthError(f"{property_uri} is not a valid Search Console site URL. Make sure you "
-                                      f"have sufficient rights if the url is valid")
+                raise ClientAuthError(f"Found no search analytics data. Make sure you have sufficient rights and the "
+                                      f"url is valid.")
             return search_analytics_data
         except socket.timeout:
             raise ClientError("Connection timed out, please try a smaller query")
@@ -114,8 +116,10 @@ class GoogleSearchConsoleClient:
     @retry(RetryableException, tries=3, delay=60, jitter=600)
     def _execute_search_analytics_request(self, service, property_uri: str, request: Dict) -> Dict:
         try:
-            return service.searchanalytics().query(siteUrl=property_uri, body=request).execute()
+            r = service.searchanalytics().query(siteUrl=property_uri, body=request).execute()
+            return r
         except HttpError as http_error:
+            logging.error(f"Encountered error when querying search analytics: {http_error}")
             if http_error.status_code == 403:
                 pass
             else:
