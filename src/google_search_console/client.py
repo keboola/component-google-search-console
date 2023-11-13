@@ -138,8 +138,8 @@ class GoogleSearchConsoleClient:
         if not sitemaps:
             sitemaps = self._get_sitemaps_data("".join(["http://", url]))
         if not sitemaps:
-            raise ClientAuthError(f"{url} is not a valid Search Console site URL. Make sure you have sufficient "
-                                  f"rights if the url is valid")
+            raise ClientAuthError(f"{url} is not a valid Search Console site URL. Check error log and make sure you "
+                                  f"have sufficient rights and if the url is valid.")
         return sitemaps
 
     @retry(RetryableException, tries=3, delay=60, jitter=600)
@@ -159,7 +159,7 @@ class GoogleSearchConsoleClient:
     @staticmethod
     def _process_exception(http_error):
         try:
-            print(http_error.error_details)
+            logging.error(http_error.error_details)
             if http_error.error_details[0]["reason"] in RETRYABLE_ERROR_CODES:
                 raise RetryableException(http_error.error_details[0]["reason"]) from http_error
             else:
