@@ -8,7 +8,11 @@ This component allows you to extract statistics and site data of domains that ar
 ## Configuration
 
 ### Authorization
-Authorization is done via instant authorization, link Google account
+
+- **Oauth 2.0** Authorization is done via instant authorization, link Google account.
+
+- For **Service account** type authorization, you will have to create a service account in [Service Account Page](https://console.cloud.google.com/projectselector2/iam-admin/serviceaccounts?supportedpurview=project) and assign proper access rights in [Google Search Console](https://search.google.com/u/1/search-console/users).
+You will also have to enable Google Search Console API in your [Google Cloud Console](https://console.cloud.google.com/apis/dashboard).
 
 ### Row configuration
 

@@ -1,3 +1,5 @@
+import logging
+
 from google.oauth2.credentials import Credentials
 from google.oauth2.service_account import Credentials as ServiceAccountCredentials
 from retry import retry
@@ -105,8 +107,8 @@ class GoogleSearchConsoleClient:
                                                                                "".join(["http://", property_uri]),
                                                                                request)
             if not search_analytics_data:
-                raise ClientAuthError(f"{property_uri} is not a valid Search Console site URL. Make sure you "
-                                      f"have sufficient rights if the url is valid")
+                raise ClientAuthError("Found no search analytics data. Make sure you have sufficient rights and the "
+                                      "url is valid.")
             return search_analytics_data
         except socket.timeout:
             raise ClientError("Connection timed out, please try a smaller query")
@@ -116,6 +118,7 @@ class GoogleSearchConsoleClient:
         try:
             return service.searchanalytics().query(siteUrl=property_uri, body=request).execute()
         except HttpError as http_error:
+            logging.error(f"Encountered error when querying search analytics: {http_error}")
             if http_error.status_code == 403:
                 pass
             else:
@@ -134,8 +137,8 @@ class GoogleSearchConsoleClient:
         if not sitemaps:
             sitemaps = self._get_sitemaps_data("".join(["http://", url]))
         if not sitemaps:
-            raise ClientAuthError(f"{url} is not a valid Search Console site URL. Make sure you have sufficient "
-                                  f"rights if the url is valid")
+            raise ClientAuthError(f"{url} is not a valid Search Console site URL. Check the error log and make sure "
+                                  f"you have sufficient rights and if the url is valid.")
         return sitemaps
 
     @retry(RetryableException, tries=3, delay=60, jitter=600)
@@ -155,7 +158,7 @@ class GoogleSearchConsoleClient:
     @staticmethod
     def _process_exception(http_error):
         try:
-            print(http_error.error_details)
+            logging.error(http_error.error_details)
             if http_error.error_details[0]["reason"] in RETRYABLE_ERROR_CODES:
                 raise RetryableException(http_error.error_details[0]["reason"]) from http_error
             else:
