@@ -30,6 +30,7 @@ KEY_AUTH_DATA = "data"
 KEY_LOADING_OPTIONS = "loading_options"
 KEY_LOADING_OPTIONS_INCREMENTAL = "incremental"
 KEY_SERVICE_ACCOUNT = "#service_account_info"
+KEY_INCLUDE_FRESH = "include_fresh"
 
 SITEMAPS_HEADERS = ["path", "lastSubmitted", "isPending", "isSitemapsIndex", "type", "lastDownloaded", "warnings",
                     "errors"]
@@ -189,12 +190,13 @@ class Component(ComponentBase):
     def _get_search_analytics_data(self, gsc_client: GoogleSearchConsoleClient, date_from: date, date_to: date,
                                    search_analytics_dimensions: List[str], search_type: str,
                                    filter_group=None) -> Generator:
+        include_fresh = self.configuration.parameters.get(KEY_INCLUDE_FRESH, False)
         if filter_group is None:
             filter_group = []
         try:
             paged_data = gsc_client.get_search_analytics_data(date_from, date_to, self.domain,
                                                               search_analytics_dimensions, search_type,
-                                                              filter_group)
+                                                              filter_group, include_fresh)
             return paged_data
         except ClientError as client_error:
             raise UserException(client_error.args[0].error_details[0]["message"]) from client_error
