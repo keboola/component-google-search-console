@@ -58,7 +58,8 @@ class GoogleSearchConsoleClient:
             'startDate': str(start_date),
             'endDate': str(end_date),
             'dimensions': dimensions,
-            "dimensionFilterGroups": []
+            "dimensionFilterGroups": [],
+            "dataState": "all"
         }
         if search_type:
             request["type"] = search_type
