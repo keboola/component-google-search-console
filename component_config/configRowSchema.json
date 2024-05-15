@@ -84,11 +84,24 @@
       "description": "Date in YYYY-MM-DD format or dateparser string i.e. 5 days ago, 1 month ago, yesterday, etc.",
       "propertyOrder": 7
     },
+    "include_fresh": {
+      "title": "Include fresh data",
+      "type": "boolean",
+      "default": false,
+      "format": "checkbox",
+      "options": {
+        "dependencies": {
+          "endpoint": "Search analytics"
+        }
+      },
+      "description": "Include also fresh data, which can change later. <a href=\"https://developers.google.com/search/blog/2019/09/search-performance-fresh-data\">Find more about fresh data in Search Console</a> ",
+      "propertyOrder": 8
+    },
     "out_table_name": {
       "title": "Output name",
       "type": "string",
       "description": "Name of output table in Keboola storage",
-      "propertyOrder": 8
+      "propertyOrder": 9
     },
     "filter_groups": {
       "type": "array",

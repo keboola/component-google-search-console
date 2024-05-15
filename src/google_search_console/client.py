@@ -53,14 +53,17 @@ class GoogleSearchConsoleClient:
         return verified_sites_urls
 
     def get_search_analytics_data(self, start_date: date, end_date: date, url: str, dimensions: List[str],
-                                  search_type: str = None, filter_groups: List[Dict] = None) -> Generator:
+                                  search_type: str = None, filter_groups: List[Dict] = None,
+                                  include_fresh: bool = False) -> Generator:
         request: Dict = {
             'startDate': str(start_date),
             'endDate': str(end_date),
             'dimensions': dimensions,
             "dimensionFilterGroups": [],
-            "dataState": "all"
         }
+        if include_fresh:
+            request["dataState"] = "all"
+
         if search_type:
             request["type"] = search_type
         for filters in filter_groups:
