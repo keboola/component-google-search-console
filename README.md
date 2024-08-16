@@ -16,7 +16,7 @@ You will also have to enable Google Search Console API in your [Google Cloud Con
 
 ### Row configuration
 
- - Domain (domain) - [REQ] Domain name you wish to extract data from eg. keboola.com
+ - Domain (domain) - [REQ] Domain name you wish to extract data from eg. keboola.com - if the domain has data across all URL variations, under the Domain it needs to be as sc-domain:domainname.com
  - Endpoint (endpoint) - [REQ] Search analytics or Sitemaps
  - Dimensions (search_analytics_dimensions) - [REQ For Search Analytics] List of search analytics dimensions eg. page, query, date
  - Type (search_type) - [OPT] filter the results for the following types : news, video, image, web, discover, or googleNews
